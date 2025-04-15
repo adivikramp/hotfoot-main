@@ -1,4 +1,4 @@
-export const hotelDetails = {
+export const hotels = {
     "search_metadata": {
         "id": "67cba2b2413b30760c4a3e39",
         "status": "Success",

@@ -1,38 +1,71 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import {
-  ActivityIndicator,
-  ScrollView,
-  Text,
-  TouchableOpacity,
   View,
-  Image,
+  Text,
+  ScrollView,
+  TouchableOpacity,
   StyleSheet,
+  SafeAreaView,
+  Image,
   Linking,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
-import { flightDetailsStep3 } from "../../constants/flights";
-import { SafeAreaView } from "react-native-safe-area-context";
 import TopBar from "../../components/topBar";
-import { AntDesign } from "@expo/vector-icons";
+import { getJourneyDetails } from "../../services/SerpApi";
 
 const BookingOptions = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const [bookingData, setBookingData] = useState(null);
+  const [selectedOption, setSelectedOption] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [bookingOptions, setBookingOptions] = useState([]);
-  const [selectedFlight, setSelectedFlight] = useState(null);
+  const [isOneWay, setIsOneWay] = useState(false);
 
   useEffect(() => {
-    if (params.bookingToken && params.flightData) {
+    const fetchBookingOptions = async () => {
       try {
-        setSelectedFlight(JSON.parse(params.flightData));
-        setBookingOptions(flightDetailsStep3[0].booking_options);
-      } catch (e) {
-        console.error("Error parsing flight data:", e);
+        setLoading(true);
+
+        const oneWay = !params.returnFlight;
+        setIsOneWay(oneWay);
+
+        const outboundFlight = JSON.parse(params.outboundFlight);
+        const returnFlight = oneWay ? null : JSON.parse(params.returnFlight);
+        const searchParams = JSON.parse(params.searchParams);
+
+        const response = await getJourneyDetails({
+          departureId: searchParams.departure_id,
+          arrivalId: searchParams.arrival_id,
+          outboundDate: searchParams.outbound_date,
+          returnDate: searchParams.return_date,
+          bookingToken: params.bookingToken,
+          type: searchParams.type,
+        });
+
+        if (!response || !response.booking_options) {
+          throw new Error("No booking options available");
+        }
+
+        setBookingData({
+          outbound: outboundFlight,
+          return: returnFlight,
+          booking_options: response.booking_options,
+          search_metadata: response.search_metadata,
+        });
+      } catch (error) {
+        console.error("Error fetching booking options:", error);
+        Alert.alert("Error", error.message || "Failed to load booking options");
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
+    };
+
+    if (params.bookingToken) {
+      fetchBookingOptions();
     }
-  }, [params.bookingToken, params.flightData]);
+  }, [params.bookingToken]);
 
   const formatTime = (timeString) => {
     if (!timeString) return "";
@@ -47,34 +80,96 @@ const BookingOptions = () => {
     return `${hours}h ${mins}m`;
   };
 
-  const handleBookOption = (bookingOption) => {
-    if (
-      bookingOption.together?.booking_request?.url &&
-      bookingOption.together?.booking_request?.post_data
-    ) {
-      const bookingUrl = `${bookingOption.together.booking_request.url}?${bookingOption.together.booking_request.post_data}`;
-      Linking.openURL(bookingUrl).catch((err) => {
+  const handleBookNow = () => {
+    if (!bookingData || !bookingData.booking_options[selectedOption]) return;
+
+    const option = bookingData.booking_options[selectedOption];
+    const bookingOption = option.together || option;
+
+    try {
+      const fullUrl = `${bookingOption.booking_request.url}?${bookingOption.booking_request.post_data}`;
+
+      Linking.openURL(fullUrl).catch((err) => {
         console.error("Failed to open booking URL:", err);
-        alert("Failed to open booking page");
+        Alert.alert("Error", "Could not open booking page");
       });
-    } else {
-      Linking.openURL(flightDetailsStep3[0].search_metadata.google_flights_url);
+    } catch (error) {
+      console.error("Error constructing booking URL:", error);
+      Alert.alert("Error", "Failed to process booking request");
     }
   };
+
+  const renderFlightCard = (flight, title) => (
+    <View style={styles.flightCard}>
+      <Text style={styles.cardTitle}>{title}</Text>
+      {flight.flights.map((segment, index) => (
+        <View key={index} style={styles.segment}>
+          <View style={styles.airlineInfo}>
+            <Image
+              source={{ uri: segment.airline_logo }}
+              style={styles.airlineLogo}
+            />
+            <Text style={styles.airlineName}>{segment.airline}</Text>
+            <Text style={styles.flightNumber}>{segment.flight_number}</Text>
+          </View>
+
+          <View style={styles.timeline}>
+            <View style={styles.timePlace}>
+              <Text style={styles.time}>
+                {formatTime(segment.departure_airport.time)}
+              </Text>
+              <Text style={styles.airportCode}>
+                {segment.departure_airport.id}
+              </Text>
+            </View>
+
+            <View style={styles.duration}>
+              <Text style={styles.durationText}>
+                {formatDuration(segment.duration)}
+              </Text>
+              <View style={styles.durationLine} />
+              <Text style={styles.aircraft}>{segment.airplane}</Text>
+            </View>
+
+            <View style={styles.timePlace}>
+              <Text style={styles.time}>
+                {formatTime(segment.arrival_airport.time)}
+              </Text>
+              <Text style={styles.airportCode}>
+                {segment.arrival_airport.id}
+              </Text>
+            </View>
+          </View>
+        </View>
+      ))}
+
+      <View style={styles.flightFooter}>
+        <Text style={styles.totalDuration}>
+          Total: {formatDuration(flight.total_duration)}
+        </Text>
+        <Text style={styles.price}>${flight.price}</Text>
+      </View>
+    </View>
+  );
 
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <ActivityIndicator size="large" color="#0066cc" style={styles.loader} />
+        <ActivityIndicator size="large" color="#0066cc" />
       </SafeAreaView>
     );
   }
 
-  if (!selectedFlight || bookingOptions.length === 0) {
+  if (!bookingData) {
     return (
       <SafeAreaView style={styles.container}>
-        <TopBar logo text="Booking Options" onBack={() => router.back()} />
         <Text style={styles.errorText}>No booking options available</Text>
+        <TouchableOpacity
+          style={styles.retryButton}
+          onPress={() => router.back()}
+        >
+          <Text style={styles.retryButtonText}>Select Different Flights</Text>
+        </TouchableOpacity>
       </SafeAreaView>
     );
   }
@@ -82,73 +177,61 @@ const BookingOptions = () => {
   return (
     <SafeAreaView style={styles.container}>
       <TopBar logo text="Booking Options" onBack={() => router.back()} />
-      <ScrollView style={styles.scrollContainer}>
-        <View style={styles.summaryContainer}>
-          <Text style={styles.routeText}>
-            {selectedFlight.flights[0].departure_airport.id} →{" "}
-            {
-              selectedFlight.flights[selectedFlight.flights.length - 1]
-                .arrival_airport.id
-            }
-          </Text>
-          <Text style={styles.totalDuration}>
-            Total Duration: {formatDuration(selectedFlight.total_duration)}
-          </Text>
-          <Text style={styles.priceText}>${selectedFlight.price}</Text>
-        </View>
 
-        <View style={styles.priceInsights}>
-          <Text style={styles.priceRange}>
-            Typical Price Range: $
-            {flightDetailsStep3[0].price_insights.typical_price_range[0]} - $
-            {flightDetailsStep3[0].price_insights.typical_price_range[1]}
-          </Text>
-          <Text style={styles.lowestPrice}>
-            Lowest Price: ${flightDetailsStep3[0].price_insights.lowest_price}
-          </Text>
-        </View>
+      <ScrollView
+        style={styles.scrollContainer}
+        contentContainerStyle={{ paddingBottom: 24 }}
+      >
+        {/* Selected Flights */}
+        <Text style={styles.sectionHeader}>Your Selected Flights</Text>
+        {renderFlightCard(bookingData.outbound, "Outbound Flight")}
+        {!isOneWay && renderFlightCard(bookingData.return, "Return Flight")}
 
-        <Text style={styles.sectionTitle}>Available Booking Options</Text>
-
-        {bookingOptions.map((option, index) => (
+        {/* Booking Options */}
+        <Text style={styles.sectionHeader}>Booking Options</Text>
+        {bookingData.booking_options.map((option, index) => (
           <TouchableOpacity
             key={index}
-            style={styles.optionCard}
-            onPress={() => handleBookOption(option)}
+            style={[
+              styles.optionCard,
+              selectedOption === index && styles.selectedOptionCard,
+            ]}
+            onPress={() => setSelectedOption(index)}
           >
             <View style={styles.optionHeader}>
-              {option.together.airline_logos?.map((logo, i) => (
-                <Image
-                  key={i}
-                  source={{ uri: logo }}
-                  style={styles.airlineLogo}
-                />
-              ))}
-              <Text style={styles.optionPrice}>${option.together.price}</Text>
+              <View style={styles.providerInfo}>
+                {option.together?.airline_logos?.map((logo, i) => (
+                  <Image
+                    key={i}
+                    source={{ uri: logo }}
+                    style={styles.optionLogo}
+                  />
+                ))}
+                <Text style={styles.providerName}>
+                  {option.together?.book_with || "Multiple Airlines"}
+                </Text>
+              </View>
+              <Text style={styles.optionPrice}>${option.together?.price}</Text>
             </View>
 
-            <Text style={styles.optionProvider}>
-              Book with: {option.together.book_with}
-            </Text>
-
-            {option.together.marketed_as && (
+            {option.together?.marketed_as && (
               <Text style={styles.flightNumbers}>
-                Flights: {option.together.marketed_as.join(", ")}
+                {option.together.marketed_as.join(" + ")}
               </Text>
             )}
 
-            {option.together.baggage_prices && (
+            {option.together?.baggage_prices && (
               <Text style={styles.baggageInfo}>
                 Baggage: {option.together.baggage_prices.join(", ")}
               </Text>
             )}
-
-            <View style={styles.bookNowButton}>
-              <Text style={styles.bookNowText}>Book Now</Text>
-              <AntDesign name="arrowright" size={16} color="#0066cc" />
-            </View>
           </TouchableOpacity>
         ))}
+
+        {/* Book Button */}
+        <TouchableOpacity style={styles.bookButton} onPress={handleBookNow}>
+          <Text style={styles.bookButtonText}>Book Now</Text>
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
@@ -160,66 +243,15 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   scrollContainer: {
-    flex: 1,
-    paddingHorizontal: 16,
-  },
-  loader: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  errorText: {
-    textAlign: "center",
-    marginTop: 20,
-    fontSize: 16,
-    color: "#666",
-  },
-  summaryContainer: {
     padding: 16,
-    backgroundColor: "#f5f9ff",
-    borderRadius: 8,
-    marginVertical: 16,
-    alignItems: "center",
   },
-  routeText: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#0066cc",
-  },
-  totalDuration: {
-    fontSize: 16,
-    color: "#333",
-    marginVertical: 4,
-  },
-  priceText: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#0066cc",
-    marginTop: 8,
-  },
-  priceInsights: {
-    padding: 12,
-    backgroundColor: "#f5f5f5",
-    borderRadius: 8,
-    marginBottom: 16,
-  },
-  priceRange: {
-    fontSize: 16,
-    color: "#333",
-    marginBottom: 4,
-  },
-  lowestPrice: {
-    fontSize: 14,
-    color: "#4CAF50",
-    fontWeight: "bold",
-  },
-  sectionTitle: {
+  sectionHeader: {
     fontSize: 18,
     fontWeight: "bold",
+    marginVertical: 16,
     color: "#333",
-    marginBottom: 12,
   },
-  optionCard: {
+  flightCard: {
     backgroundColor: "#fff",
     borderRadius: 8,
     padding: 16,
@@ -232,26 +264,122 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    marginBottom: 12,
+    color: "#0066cc",
+  },
+  segment: {
+    marginBottom: 16,
+  },
+  airlineInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  airlineLogo: {
+    width: 24,
+    height: 24,
+    marginRight: 8,
+  },
+  airlineName: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginRight: 8,
+  },
+  flightNumber: {
+    fontSize: 14,
+    color: "#666",
+  },
+  timeline: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  timePlace: {
+    alignItems: "center",
+    width: "30%",
+  },
+  time: {
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  airportCode: {
+    fontSize: 16,
+    color: "#0066cc",
+    fontWeight: "bold",
+  },
+  duration: {
+    alignItems: "center",
+    width: "40%",
+  },
+  durationText: {
+    fontSize: 12,
+    color: "#666",
+  },
+  durationLine: {
+    height: 1,
+    backgroundColor: "#ccc",
+    width: "100%",
+    marginVertical: 4,
+  },
+  aircraft: {
+    fontSize: 12,
+    color: "#666",
+  },
+  flightFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    borderTopWidth: 1,
+    borderTopColor: "#eee",
+    paddingTop: 12,
+    marginTop: 8,
+  },
+  totalDuration: {
+    fontSize: 14,
+    color: "#666",
+  },
+  price: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#0066cc",
+  },
+  optionCard: {
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#eee",
+  },
+  selectedOptionCard: {
+    borderColor: "#0066cc",
+    backgroundColor: "#f5f9ff",
+  },
   optionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: 8,
   },
-  airlineLogo: {
-    width: 30,
-    height: 30,
+  providerInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  optionLogo: {
+    width: 24,
+    height: 24,
     marginRight: 8,
   },
+  providerName: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
   optionPrice: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "bold",
     color: "#0066cc",
-  },
-  optionProvider: {
-    fontSize: 16,
-    color: "#333",
-    marginBottom: 8,
   },
   flightNumbers: {
     fontSize: 14,
@@ -261,19 +389,34 @@ const styles = StyleSheet.create({
   baggageInfo: {
     fontSize: 14,
     color: "#666",
-    marginBottom: 12,
   },
-  bookNowButton: {
-    flexDirection: "row",
+  bookButton: {
+    backgroundColor: "#000000",
+    padding: 16,
+    borderRadius: 8,
     alignItems: "center",
-    justifyContent: "flex-end",
-    marginTop: 8,
+    marginTop: 16,
   },
-  bookNowText: {
-    color: "#0066cc",
+  bookButtonText: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  errorText: {
+    textAlign: "center",
     fontSize: 16,
-    fontWeight: "600",
-    marginRight: 8,
+    color: "#666",
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: "#0066cc",
+    padding: 15,
+    borderRadius: 5,
+    alignSelf: "center",
+  },
+  retryButtonText: {
+    color: "white",
+    fontWeight: "bold",
   },
 });
 

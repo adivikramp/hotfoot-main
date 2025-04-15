@@ -6,56 +6,38 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from "react-native";
-import { MotiView, MotiText, AnimatePresence } from "moti";
+import { MotiView } from "moti";
 import { LinearGradient } from "expo-linear-gradient";
 import { Star } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
-import { useNavigation, useRouter } from "expo-router";
-import useTripSearchStore from "../../app/store/trpiSearchZustandStore";
-import DatePickerModal from "../datePickerModal/datePickerModal";
+import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 
-// Enhanced Hotel Card Component in Row View with Monochrome Theme - Shorter Version
-export const HotelCard = ({ hotel }) => {
-  //   const navigation = useNavigation();
+export const HotelCardResults = ({ hotel, searchParams }) => {
   const router = useRouter();
-  const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
-  const { setDatesToStore, resetSearch } = useTripSearchStore();
-
-  const handleDateConfirm = (selectedDates) => {
-    console.log("selectedDates:", selectedDates);
-    setDatesToStore({
-      startDate: selectedDates.startDate,
-      endDate: selectedDates.endDate,
-    });
-    setIsDatePickerVisible(false);
-    // navigation.navigate("hotel/[id]", {
-    //   property_token: hotel?.property_token,
-    // });
-    router.push({
-      pathname: "/hotel/[id]",
-      params: { id: hotel?.property_token, searchParams: JSON.stringify(searchParams) },
-    });
-  };
-  // create a function handlePress to handle the press event on the card, when the card is pressed, it will log the hotel name user should redirect to the hotel details page, with the hotel id
-  const handlePress = () => {
-    console.log("Card Pressed: ", hotel?.name);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    resetSearch();
-    setIsDatePickerVisible(true);
-  };
-
-  const closeModal = () => {
-    setIsDatePickerVisible(false);
-  };
-
   const [loading, setLoading] = useState(true);
+
   useEffect(() => {
     setTimeout(() => {
       setLoading(false);
     }, 1000);
   }, []);
-  // console.log(hotel);
+
+  const handlePress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    router.push({
+      pathname: "/hotel/[id]",
+      params: {
+        id: hotel?.property_token,
+        name: hotel?.name,
+        image: hotel?.images[0]?.original_image,
+        location: `${hotel?.nearby_places[0]?.name || "City Centre"}`,
+        searchParams: JSON.stringify(searchParams),
+      },
+    });
+  };
+
   return loading ? (
     <ActivityIndicator size="large" color="#0000ff" />
   ) : (
@@ -69,7 +51,6 @@ export const HotelCard = ({ hotel }) => {
           delay: 200,
         }}
         style={styles.hotelCard}
-        onpress={() => console.log("Card Pressed")}
       >
         {/* Left side image with overlay gradient */}
         <View style={styles.imageContainer}>
@@ -90,27 +71,21 @@ export const HotelCard = ({ hotel }) => {
 
         {/* Right side content */}
         <View style={styles.hotelContent}>
-          {/* Header with name and heart icon */}
           <View style={styles.hotelHeader}>
             <Text style={styles.hotelName} numberOfLines={1}>
               {hotel?.name}
             </Text>
-            {/* <TouchableOpacity style={styles.favoriteButton}>
-                        <Text style={styles.heartIcon}>♡</Text>
-                    </TouchableOpacity> */}
           </View>
 
-          {/* Location with icon */}
           <View style={styles.locationContainer}>
             <View style={styles.locationDot} />
             <Text style={styles.locationText} numberOfLines={1}>
-              {`${hotel?.nearby_places[0]?.name || "Dublin City Centre"} - ${
+              {`${hotel?.nearby_places[0]?.name || "City Centre"} - ${
                 hotel?.nearby_places[0]?.transportations[0]?.duration || "5 min"
               }s ${hotel?.nearby_places[0]?.transportations[0]?.type}`}
             </Text>
           </View>
 
-          {/* Rating and price in one row */}
           <View style={styles.bottomRow}>
             <View style={styles.ratingContainer}>
               <View style={styles.ratingBadge}>
@@ -145,27 +120,12 @@ export const HotelCard = ({ hotel }) => {
               </Text>
             </View>
           </View>
-
-          {/* Book button */}
-          {/* <TouchableOpacity style={styles.bookButton}>
-                    <Text style={styles.bookButtonText}>Book</Text>
-                </TouchableOpacity> */}
         </View>
       </MotiView>
-      <DatePickerModal
-        visible={isDatePickerVisible}
-        // onClose={() => setIsDatePickerVisible(false)}
-        onClose={closeModal}
-        onSelectDates={handleDateConfirm}
-        activeTab={"Places"}
-        tripType={"Round Trip"}
-        // initialDates={dates}
-      />
     </TouchableOpacity>
   );
 };
 
-// Updated styles with reduced height
 const styles = StyleSheet.create({
   hotelCard: {
     flexDirection: "row",
@@ -178,13 +138,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 6,
     overflow: "hidden",
-    height: 90, // Reduced from 170
+    height: 90,
     borderWidth: 1,
     borderColor: "#f0f0f0",
-    // marginRight: 16,
   },
   imageContainer: {
-    width: "35%", // Slightly reduced from 40%
+    width: "35%",
     position: "relative",
   },
   hotelImage: {
@@ -228,18 +187,6 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#000000",
     flex: 1,
-  },
-  favoriteButton: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "#F0F0F0",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  heartIcon: {
-    fontSize: 14,
-    color: "#666666",
   },
   locationContainer: {
     flexDirection: "row",
@@ -292,7 +239,6 @@ const styles = StyleSheet.create({
   originalPrice: {
     fontSize: 10,
     color: "#999999",
-    // textDecorationLine: 'line-through',
     marginRight: 4,
   },
   currentPrice: {
@@ -300,71 +246,4 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#333333",
   },
-  bookButton: {
-    backgroundColor: "#222222",
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 12,
-    alignSelf: "flex-start",
-    marginTop: 6,
-  },
-  bookButtonText: {
-    color: "#FFFFFF",
-    fontSize: 12,
-    fontWeight: "bold",
-  },
 });
-
-// Implementation in the main component
-const renderHotelCards = () => {
-  const hotelData = [
-    {
-      name: "LATICOUPE Jacobs Inn Dublin",
-      image:
-        "https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=2070&auto=format&fit=crop",
-      rating: 4.2,
-      reviews: "1.1K",
-      price: "64",
-      originalPrice: "89",
-      location: "Dublin City Centre - 0.5 mi from center",
-      verified: true,
-      recommended: true,
-    },
-    {
-      name: "The Plaza Hotel",
-      image:
-        "https://images.unsplash.com/photo-1611892440504-42a792e24d32?q=80&w=2070&auto=format&fit=crop",
-      rating: 4.5,
-      reviews: "1.1K",
-      price: "76",
-      originalPrice: "105",
-      discount: 28,
-      location: "Temple Bar - 0.2 mi from center",
-      verified: true,
-    },
-    {
-      name: "Premier Inn Dublin City Centre",
-      image:
-        "https://images.unsplash.com/photo-1590490360182-c33d57733427?q=80&w=2070&auto=format&fit=crop",
-      rating: 4.8,
-      reviews: "2.3K",
-      price: "82",
-      location: "Grafton Street - 0.3 mi from center",
-      recommended: true,
-    },
-  ];
-
-  return (
-    <View style={styles.hotelCardsContainer}>
-      {hotelData.map((hotel, index) => (
-        <HotelCard key={index} hotel={hotel} />
-      ))}
-    </View>
-  );
-};
-
-// Add this to your main styles
-// styles.hotelCardsContainer = {
-//   paddingHorizontal: 16,
-//   marginTop: 16,
-// };

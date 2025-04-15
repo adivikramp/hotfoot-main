@@ -7,7 +7,7 @@ import {
   Image,
   ScrollView,
 } from "react-native";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import TopBar from "../../components/topBar";
 import { StatusBar } from "expo-status-bar";
 import { Grip, Trash2 } from "lucide-react-native";
@@ -20,12 +20,15 @@ export default function Edit() {
   const [trip, setTrip] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [hasChanges, setHasChanges] = useState(false);
+  const initialTripData = useRef(null);
 
   useEffect(() => {
     if (tripData) {
       try {
         if (typeof tripData === "string") {
           const parsedTrip = JSON.parse(tripData);
+          initialTripData.current = JSON.parse(JSON.stringify(parsedTrip));
           setTrip(parsedTrip);
         } else {
           throw new Error("Invalid trip data format");
@@ -43,16 +46,60 @@ export default function Edit() {
   }, [tripData]);
 
   const handleDayPlanChange = (dayKey, newPlaces) => {
-    setTrip((prevTrip) => ({
-      ...prevTrip,
-      dailyPlan: {
-        ...prevTrip.dailyPlan,
-        [dayKey]: {
-          ...prevTrip.dailyPlan[dayKey],
-          places: newPlaces,
+    setTrip((prevTrip) => {
+      const updatedTrip = {
+        ...prevTrip,
+        dailyPlan: {
+          ...prevTrip.dailyPlan,
+          [dayKey]: {
+            ...prevTrip.dailyPlan[dayKey],
+            places: newPlaces,
+          },
         },
-      },
-    }));
+      };
+
+      const hasChanges =
+        JSON.stringify(updatedTrip.dailyPlan) !==
+        JSON.stringify(initialTripData.current.dailyPlan);
+      setHasChanges(hasChanges);
+
+      return updatedTrip;
+    });
+  };
+
+  const saveChanges = () => {
+    if (trip) {
+      router.replace({
+        pathname: "/trip-details",
+        params: { tripData: JSON.stringify(trip) },
+      });
+    }
+  };
+
+  const deletePlace = (dayKey, index) => {
+    setTrip((prevTrip) => {
+      const newPlaces = prevTrip.dailyPlan[dayKey].places.filter(
+        (_, i) => i !== index
+      );
+
+      const updatedTrip = {
+        ...prevTrip,
+        dailyPlan: {
+          ...prevTrip.dailyPlan,
+          [dayKey]: {
+            ...prevTrip.dailyPlan[dayKey],
+            places: newPlaces,
+          },
+        },
+      };
+
+      const hasChanges =
+        JSON.stringify(updatedTrip.dailyPlan) !==
+        JSON.stringify(initialTripData.current.dailyPlan);
+      setHasChanges(hasChanges);
+
+      return updatedTrip;
+    });
   };
 
   if (loading) {
@@ -94,57 +141,77 @@ export default function Edit() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <View className="flex-1 bg-white p-4 pt-12">
-        <TopBar text="Edit Itinerary" backarrow={true} rightIcons={[]} />
+        <TopBar text="Edit Itinerary" backarrow={true} />
 
         <ScrollView
           className="flex-1"
-          contentContainerStyle={{ paddingBottom: 40 }}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: hasChanges ? 100 : 80 }}
         >
-          {Object.entries(trip.dailyPlan).map(([dayKey, dayPlan]) => (
-            <View key={dayKey} className="mb-8">
-              <Text className="text-xl font-semibold mb-4">
-                {dayKey.replace("day", "Day ")}
-              </Text>
+          {Object.entries(trip.dailyPlan).map(([dayKey, dayPlan]) => {
+            const dayPlaces = dayPlan.places || [];
+            return (
+              <View key={dayKey} className="mb-8">
+                <Text className="text-xl font-semibold mb-4">
+                  {dayKey.replace("day", "Day ")}
+                </Text>
 
-              <DraggableFlatList
-                data={dayPlan.places || []}
-                keyExtractor={(index) => `draggable-item-${index}`}
-                onDragEnd={({ data }) => handleDayPlanChange(dayKey, data)}
-                renderItem={({ item, drag, isActive }) => (
-                  <TouchableOpacity
-                    onLongPress={drag}
-                    disabled={isActive}
-                    className={`flex-row mb-4 items-center p-3 rounded-lg ${
-                      isActive ? "bg-gray-100" : "bg-white"
-                    }`}
-                  >
-                    <View className="mr-3">
-                      <Grip size={20} color="black" />
-                    </View>
-                    {item.image && (
-                      <Image
-                        source={{ uri: item.image }}
-                        className="w-20 h-16 rounded-lg mr-3"
-                        resizeMode="cover"
-                      />
-                    )}
-                    <View className="flex-1">
-                      <Text className="text-lg font-bold">{item.name}</Text>
-                      <Text className="text-gray-500 text-sm">{item.time}</Text>
-                    </View>
-                    <View className="mr-3">
-                      <Trash2 size={20} color="red" />
-                    </View>
-                  </TouchableOpacity>
-                )}
-                contentContainerStyle={{ paddingBottom: 0 }}
-              />
-            </View>
-          ))}
+                <DraggableFlatList
+                  data={dayPlaces}
+                  keyExtractor={(item, index) => `place-${dayKey}-${index}`}
+                  onDragEnd={({ data }) => handleDayPlanChange(dayKey, data)}
+                  renderItem={({ item, drag, isActive, getIndex }) => {
+                    const index = getIndex();
+                    return (
+                      <TouchableOpacity
+                        onLongPress={drag}
+                        disabled={isActive}
+                        className={`flex-row mb-4 items-center p-3 rounded-lg ${
+                          isActive ? "bg-gray-100" : "bg-white"
+                        }`}
+                      >
+                        <View className="mr-3">
+                          <Grip size={20} color="black" />
+                        </View>
+                        {item.image && (
+                          <Image
+                            source={{ uri: item.image }}
+                            className="w-20 h-16 rounded-lg mr-3"
+                            resizeMode="cover"
+                          />
+                        )}
+                        <View className="flex-1">
+                          <Text className="text-lg font-bold">{item.name}</Text>
+                          <Text className="text-gray-500 text-sm">
+                            {item.time}
+                          </Text>
+                        </View>
+                        <TouchableOpacity
+                          onPress={() => deletePlace(dayKey, index)}
+                        >
+                          <Trash2 size={20} color="red" />
+                        </TouchableOpacity>
+                      </TouchableOpacity>
+                    );
+                  }}
+                  contentContainerStyle={{ paddingBottom: 0 }}
+                />
+              </View>
+            );
+          })}
         </ScrollView>
 
-        <View className="absolute bottom-4 left-0 right-0 px-4 bg-white h-12">
-          <TouchableOpacity className="bg-green-100 rounded-full py-4 items-center justify-center">
+        <View className="absolute bottom-0 left-0 right-0 bg-white pt-2 pb-4 px-4">
+          {hasChanges && (
+            <TouchableOpacity
+              className="bg-black rounded-full py-3 items-center justify-center mb-2"
+              onPress={saveChanges}
+            >
+              <Text className="text-white font-medium">Save Changes</Text>
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity className="bg-green-100 rounded-full py-3 items-center justify-center">
             <Text className="text-green-500 font-medium">Add More Events</Text>
           </TouchableOpacity>
         </View>

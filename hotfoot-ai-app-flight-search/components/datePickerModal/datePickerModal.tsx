@@ -93,7 +93,7 @@ export default function DatePickerModal({
                   selectedEndDate={endDate || undefined}
                   restrictMonthNavigation={true}
                   onDateChange={(date, type) => handleDateChange(date, type)}
-                  allowRangeSelection={true}
+                  allowRangeSelection={tripType === 'Round Trip' ? true : false}
                   minDate={new Date()}
                   maxRangeDuration={7}
                   selectedRangeStyle={{

@@ -14,6 +14,12 @@ import PlaceAutocomplete from "../googleAutocomplete/placeAutocomplete";
 import useTripSearchStore from "../../app/store/trpiSearchZustandStore";
 import { useNavigation } from "expo-router";
 import DatePickerModal from "../datePickerModal/datePickerModal";
+import {
+  formatFlightSearchParams,
+  formatHotelSearchParams,
+  searchHotels,
+  searchOutboundFlights,
+} from "../../services/SerpApi";
 
 // Main tabs component
 const TabBar = ({ activeTab, setActiveTab }) => {
@@ -183,8 +189,8 @@ const UnifiedSearchForm = ({ activeTab, onClose }) => {
     code: "LHR",
   });
   const [toLocation, setToLocation] = useState({
-    name: "Delhi",
-    code: "DEL",
+    name: "Mumbai",
+    code: "BOM",
   });
   const [dates, setDates] = useState({ startDate: null, endDate: null });
   const [travelers, setTravelers] = useState({
@@ -196,6 +202,20 @@ const UnifiedSearchForm = ({ activeTab, onClose }) => {
   const [tripType, setTripType] = useState("Round Trip");
   const [isTravelersDropdownOpen, setIsTravelersDropdownOpen] = useState(false);
   const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
+
+  useEffect(() => {
+    setTripTypeToStore(tripType);
+    if (tripType === "One Way") {
+      setDates((prev) => ({ ...prev, endDate: null }));
+      setDatesToStore({ ...dates, endDate: null });
+    }
+  }, [tripType]);
+
+  useEffect(() => {
+    if (selectedTripType && selectedTripType !== tripType) {
+      setTripType(selectedTripType);
+    }
+  }, [selectedTripType]);
 
   const handleDateSelect = () => {
     setIsTravelersDropdownOpen(false);
@@ -224,7 +244,32 @@ const UnifiedSearchForm = ({ activeTab, onClose }) => {
     setTravelersToStore,
     setCabinClassToStore,
     setTripTypeToStore,
+    fromLocation: selectedFromLocation,
+    toLocation: selectedToLocation,
+    dates: { startDate, endDate },
+    travelers: { adults, children, infants },
+    cabinClass: selectedCabinClass,
+    tripType: selectedTripType,
   } = useTripSearchStore();
+
+  useEffect(() => {
+    console.log("Selected From Location:", selectedFromLocation);
+    console.log("Selected To Location:", selectedToLocation);
+    console.log("Selected Dates:", { startDate, endDate });
+    console.log("Selected Travelers:", { adults, children, infants });
+    console.log("Selected Cabin Class:", selectedCabinClass);
+    console.log("Selected Trip Type:", selectedTripType);
+  }, [
+    selectedFromLocation,
+    selectedToLocation,
+    startDate,
+    endDate,
+    adults,
+    children,
+    infants,
+    selectedCabinClass,
+    selectedTripType,
+  ]);
 
   // New state to control PlaceAutocomplete modal
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -246,10 +291,6 @@ const UnifiedSearchForm = ({ activeTab, onClose }) => {
       setIsDatePickerVisible(false);
     };
   }, []);
-
-  useEffect(() => {
-    console.log("Date Picker Modal State:", isDatePickerVisible);
-  }, [isDatePickerVisible]);
 
   // Get total travelers
   const getTotalTravelers = () => {
@@ -345,7 +386,7 @@ const UnifiedSearchForm = ({ activeTab, onClose }) => {
   };
 
   // Handle search button press
-  const handleSearch = () => {
+  const handleSearch = async () => {
     setIsTravelersDropdownOpen(false);
     // alert(`${activeTab} search initiated!`);
     // Set all parameters in the Zustand store
@@ -363,15 +404,54 @@ const UnifiedSearchForm = ({ activeTab, onClose }) => {
         navigation.navigate("place/cityDetails");
         onClose();
         break;
+
       case "Flights":
-        // console.log('Navigating to FlightDetails');
-        navigation.navigate("flightDetails/index");
-        onClose();
+        const searchData = {
+          fromLocation,
+          toLocation,
+          dates,
+          travelers,
+          cabinClass,
+          tripType,
+        };
+        try {
+          const apiParams = formatFlightSearchParams(searchData);
+          const flightResults = await searchOutboundFlights(apiParams);
+          navigation.navigate("flightDetails/index", {
+            flightResults: JSON.stringify(flightResults),
+            searchData: JSON.stringify(apiParams),
+          });
+          onClose();
+        } catch (error) {
+          console.error("Flight search error:", error);
+          Alert.alert(
+            "Error",
+            "Failed to search for flights. Please try again."
+          );
+        }
         break;
+
       case "Hotels":
-        // console.log('Navigating to HotelDetails');
-        navigation.navigate("HotelDetails");
-        onClose();
+        const searchDataHotels = {
+          toLocation,
+          dates,
+          travelers,
+        };
+        try {
+          const apiParams = formatHotelSearchParams(searchDataHotels);
+          const hotelResults = await searchHotels(apiParams);
+          navigation.navigate("hotel/results", {
+            hotelResults: JSON.stringify(hotelResults),
+            searchData: JSON.stringify(apiParams),
+          });
+          onClose();
+        } catch (error) {
+          console.error("Hotel search error:", error);
+          Alert.alert(
+            "Error",
+            "Failed to search for hotels. Please try again."
+          );
+        }
         break;
       default:
         console.warn("Unknown tab:", activeTab);
