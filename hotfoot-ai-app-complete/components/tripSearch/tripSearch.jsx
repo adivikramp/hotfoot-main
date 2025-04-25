@@ -182,16 +182,16 @@ const TravelersDropdown = ({ travelers, setTravelers }) => {
 // Unified Search Form Component
 const UnifiedSearchForm = ({ activeTab, onClose }) => {
   // Common state for all tabs
-  // const [fromLocation, setFromLocation] = useState(null);
-  // const [toLocation, setToLocation] = useState(null);
-  const [fromLocation, setFromLocation] = useState({
-    name: "London",
-    code: "LHR",
-  });
-  const [toLocation, setToLocation] = useState({
-    name: "Mumbai",
-    code: "BOM",
-  });
+  const [fromLocation, setFromLocation] = useState(null);
+  const [toLocation, setToLocation] = useState(null);
+  // const [fromLocation, setFromLocation] = useState({
+  //   name: "London",
+  //   code: "LHR",
+  // });
+  // const [toLocation, setToLocation] = useState({
+  //   name: "Mumbai",
+  //   code: "BOM",
+  // });
   const [dates, setDates] = useState({ startDate: null, endDate: null });
   const [travelers, setTravelers] = useState({
     adults: 1,
@@ -216,6 +216,13 @@ const UnifiedSearchForm = ({ activeTab, onClose }) => {
       setTripType(selectedTripType);
     }
   }, [selectedTripType]);
+
+  useEffect(() => {
+    if (activeTab === "Hotels" || activeTab === "Places") {
+      setTripType("Round Trip");
+      setTripTypeToStore("Round Trip");
+    }
+  }, [activeTab]);
 
   const handleDateSelect = () => {
     setIsTravelersDropdownOpen(false);
@@ -375,11 +382,11 @@ const UnifiedSearchForm = ({ activeTab, onClose }) => {
   const shouldShowField = (fieldName) => {
     switch (fieldName) {
       case "tripType":
-        return activeTab === "Flights" || activeTab === "Places";
+        return activeTab === "Flights";
       case "from":
         return activeTab === "Flights" || activeTab === "Places";
       case "cabinClass":
-        return activeTab === "Flights" || activeTab === "Places";
+        return activeTab === "Flights";
       default:
         return true;
     }

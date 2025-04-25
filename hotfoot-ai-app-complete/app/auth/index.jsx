@@ -58,11 +58,12 @@ const LoginScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View>
+      <View style={styles.logoContainer}>
         <Image
           style={styles.image}
           source={require("../../assets/images/logo.png")}
         />
+        <Text style={styles.companyName}>Hotfoot AI</Text>
       </View>
       <Text style={styles.title}>Let's Get Started!</Text>
       <Text style={styles.subtitle}>Your Passport to Adventure Awaits</Text>
@@ -121,16 +122,25 @@ const styles = StyleSheet.create({
     alignItems: "center", // Centers horizontally
     backgroundColor: "white",
   },
+  logoContainer: {
+    alignItems: "center",
+    marginBottom: 40,
+  },
   image: {
-    height: 150,
-    width: 150,
-    marginBottom: 15,
+    height: 120,
+    width: 120,
+  },
+  companyName: {
+    fontSize: 28,
+    fontWeight: "700",
+    color: "#111",
+    letterSpacing: 0.5,
   },
   title: {
-    fontSize: 25,
+    fontSize: 22,
     color: "black",
-    fontWeight: 700,
-    marginBottom: 15,
+    fontWeight: 600,
+    marginBottom: 4,
   },
   subtitle: {
     fontSize: 15,

@@ -7,6 +7,7 @@ import { BookmarkIcon, EllipsisVertical } from "lucide-react-native";
 import { SearchModal } from "../../components/animatedExploreBar/SearchModal";
 import TopBar from "../../components/topBar/index.js";
 import { useRouter } from "expo-router";
+import SkeletonLoading from "../../components/skeletonLoading/skeletonLoading.jsx";
 
 const Trips = () => {
   const router = useRouter();
@@ -45,7 +46,8 @@ const Trips = () => {
       >
         {loading ? (
           <View className="mx-4">
-            <ActivityIndicator size="large" color="#0000ff" />
+            {/* <ActivityIndicator size="large" color="#0000ff" /> */}
+            <SkeletonLoading />
           </View>
         ) : (
           <>

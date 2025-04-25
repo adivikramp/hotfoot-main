@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  ActivityIndicator,
   SafeAreaView,
   Modal,
 } from "react-native";
@@ -19,12 +18,15 @@ const PlaceAutocomplete = ({
   modalVisible,
   setModalVisible,
   currentField,
+  activeTab,
 }) => {
   const [selectedCity, setSelectedCity] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const handleCitySelect = (data, details) => {
     if (details) {
+      console.log("Selected city data:", details);
+
       setLoading(true);
 
       // Extract city code from address components if available
@@ -75,9 +77,13 @@ const PlaceAutocomplete = ({
       transparent={false}
       visible={modalVisible}
       onRequestClose={() => setModalVisible(false)}
+      keyboardShouldPersistTaps="always"
     >
-      <SafeAreaView style={styles.modalContainer}>
-        <View style={styles.modalHeader}>
+      <SafeAreaView
+        style={styles.modalContainer}
+        keyboardShouldPersistTaps="always"
+      >
+        <View style={styles.modalHeader} keyboardShouldPersistTaps="always">
           <TouchableOpacity onPress={() => setModalVisible(false)}>
             <Ionicons name="arrow-back" size={24} color="black" />
           </TouchableOpacity>

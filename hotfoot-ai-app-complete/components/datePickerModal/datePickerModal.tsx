@@ -39,10 +39,13 @@ export default function DatePickerModal({
   );
 
   const isEndDateRequired = () => {
+    if (activeTab === 'Hotels' || activeTab === 'Places') {
+      return true;
+    }
     if (activeTab === 'Flights') {
       return tripType !== 'One Way';
     }
-    return activeTab === 'Hotels';
+    return true;
   };
 
   const handleConfirm = () => {
@@ -88,7 +91,7 @@ export default function DatePickerModal({
             <View style={styles.dateSelectionContainer}>
               <Text className="text-neutral-500 text-lg">Choose the dates for your trip. This helps us plan the perfect itinerary for your travel period.</Text>
               <View className='pb-6'>
-                <CalendarPicker
+                {/* <CalendarPicker
                   selectedStartDate={startDate}
                   selectedEndDate={endDate || undefined}
                   restrictMonthNavigation={true}
@@ -96,6 +99,19 @@ export default function DatePickerModal({
                   allowRangeSelection={tripType === 'Round Trip' ? true : false}
                   minDate={new Date()}
                   maxRangeDuration={7}
+                  selectedRangeStyle={{
+                    backgroundColor: '#32B37D'
+                  }}
+                  selectedDayTextStyle={{ color: 'white' }}
+                /> */}
+                <CalendarPicker
+                  selectedStartDate={startDate}
+                  selectedEndDate={endDate || undefined}
+                  restrictMonthNavigation={true}
+                  onDateChange={(date, type) => handleDateChange(date, type)}
+                  allowRangeSelection={activeTab !== 'Flights' || tripType === 'Round Trip'}
+                  minDate={new Date()}
+                  maxRangeDuration={(activeTab === 'Flights' ? 9 : undefined) || (activeTab === 'Places' ? 13 : undefined)}
                   selectedRangeStyle={{
                     backgroundColor: '#32B37D'
                   }}

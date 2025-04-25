@@ -27,8 +27,8 @@ const useUserStore = create<UserState>()(
             locationPermission: null,
             loading: false,
             error: null,
-            // API_BASE_URL: "http://192.168.29.125:5000",
-            API_BASE_URL: "http://192.168.1.6:5000",
+            API_BASE_URL: "http://192.168.29.125:5000",
+            // API_BASE_URL: "http://192.168.1.6:5000",
 
             fetchUserData: async (userId, getToken) => {
                 try {

@@ -29,14 +29,10 @@ const PersonalTouch = () => {
   const [countryCode, setCountryCode] = useState("");
   const [country, setCountry] = useState(null);
 
-  const fromOnboarding = params.fromOnboarding === "true";
-
-  const returnPath = params.returnPath;
-
   const {
     control,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isValid },
     reset,
   } = useForm({
     defaultValues: {
@@ -45,6 +41,7 @@ const PersonalTouch = () => {
       email: "",
       phoneNumber: "",
     },
+    mode: "onChange",
   });
 
   useEffect(() => {
@@ -254,7 +251,11 @@ const PersonalTouch = () => {
           )}
         </View>
       </ScrollView>
-      <BottomBarContinueBtn handleDone={handleSubmit(onSubmit)} />
+      <BottomBarContinueBtn
+        handleDone={handleSubmit(onSubmit)}
+        disabled={!isValid || !country}
+        buttonText="Continue"
+      />
     </SafeAreaView>
   );
 };

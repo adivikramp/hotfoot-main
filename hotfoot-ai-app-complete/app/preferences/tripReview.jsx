@@ -18,6 +18,23 @@ import BottomBarContinueBtn from "../../components/buttons/bottomBarContinueBtn"
 import { useRouter } from "expo-router";
 import DatePickerModal from "../../components/datePickerModal/datePickerModal";
 import { GetPlaceDetails } from "../../services/GlobalApi";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import SkeletonLoading from "../../components/skeletonLoading/skeletonLoading";
+
+const apiKey = process.env.EXPO_PUBLIC_GOOGLE_GEMINI_API_KEY;
+const genAI = new GoogleGenerativeAI(apiKey);
+
+const model = genAI.getGenerativeModel({
+  model: "gemini-2.0-flash",
+});
+
+const generationConfig = {
+  temperature: 1,
+  topP: 0.95,
+  topK: 40,
+  maxOutputTokens: 8192,
+  responseMimeType: "application/json",
+};
 
 const TravelersDropdown = ({ travelers, setTravelers }) => {
   const updateTravelerCount = (type, increment) => {
@@ -193,29 +210,32 @@ const ReviewSummaryScreen = ({ navigation }) => {
     setIsDatePickerVisible(false);
   };
 
-  const handleEditInterests = () => {
-    router.push({
-      pathname: "/preferences/travelPreferences",
-      params: {
-        returnPath: "/preferences/tripReview",
-        flow: "review",
-      },
-    });
-  };
+  // const handleEditInterests = () => {
+  //   router.push({
+  //     pathname: "/preferences/travelPreferences",
+  //     params: {
+  //       returnPath: "/preferences/tripReview",
+  //       flow: "review",
+  //     },
+  //   });
+  // };
 
-  const handleEditBudget = () => {
-    router.push({
-      pathname: "/preferences/budgetSelection",
-      params: { returnPath: "/preferences/tripReview" },
-    });
-  };
+  // const handleEditBudget = () => {
+  //   router.push({
+  //     pathname: "/preferences/budgetSelection",
+  //     params: { returnPath: "/preferences/tripReview" },
+  //   });
+  // };
 
   const generateTrip = async () => {
     setIsGenerating(true);
+    const { setGeneratedPlaces, setGeneratedItinerary, setTripParameters } =
+      useItineraryStore.getState();
 
     try {
       // 1. First fetch nearby places
       const nearbyPlaces = await fetchNearbyPlaces();
+      setGeneratedPlaces(nearbyPlaces);
 
       if (!nearbyPlaces || nearbyPlaces.length === 0) {
         Alert.alert("No places found", "Couldn't find any nearby attractions");
@@ -226,20 +246,20 @@ const ReviewSummaryScreen = ({ navigation }) => {
       const itineraryData = {
         destination: toLocation?.name || "",
         coordinates: {
-          // latitude: toLocation?.geoCode?.latitude,
-          // longitude: toLocation?.geoCode?.longitude,
-          latitude: 19.076090,
+          latitude: 19.07609,
           longitude: 72.877426,
         },
         dates: {
           start: dates.startDate,
           end: dates.endDate,
           duration: dates.totalDays,
+          totalNights: dates.totalDays - 1,
         },
         travelers: {
           adults: travelers.adults,
           children: travelers.children,
           infants: travelers.infants,
+          description: getTravelerDescription(travelers),
         },
         preferences: {
           interests: selectedButtons,
@@ -253,13 +273,36 @@ const ReviewSummaryScreen = ({ navigation }) => {
         })),
       };
 
-      console.log("Sending to itinerary generation:", itineraryData);
+      // Save trip parameters to store
+      setTripParameters({
+        destination: toLocation?.name,
+        dates,
+        travelers,
+        preferences: {
+          interests: selectedButtons,
+          budget: budgetPreference,
+          tripType,
+        },
+      });
 
-      // 3. Here you would call your LLM API with itineraryData
-      // const itinerary = await generateItinerary(itineraryData);
+      // 3. Generate the AI itinerary
+      const itinerary = await generateAItinerary(itineraryData);
+      setGeneratedItinerary(itinerary);
 
-      // 4. For now, just navigate to a placeholder screen
-      router.replace("/home");
+      // 4. Save to database
+      // await saveItineraryToDB({
+      //   places: nearbyPlaces,
+      //   itinerary,
+      //   parameters: itineraryData,
+      // });
+
+      // 5. Navigate to itinerary screen
+      router.replace({
+        pathname: "/itinerary",
+        params: {
+          newlyGenerated: "true", // Flag to indicate this is a new itinerary
+        },
+      });
     } catch (error) {
       console.error("Error generating itinerary:", error);
       Alert.alert("Error", "Failed to generate itinerary. Please try again.");
@@ -292,7 +335,7 @@ const ReviewSummaryScreen = ({ navigation }) => {
             center: {
               // latitude: toLocation.geoCode.latitude,
               // longitude: toLocation.geoCode.longitude,
-              latitude: 19.076090,
+              latitude: 19.07609,
               longitude: 72.877426,
             },
             radius: 15000,
@@ -305,6 +348,123 @@ const ReviewSummaryScreen = ({ navigation }) => {
       console.error("Error fetching nearby places:", error);
       Alert.alert("Error", "Failed to fetch nearby places. Please try again.");
       return [];
+    }
+  };
+
+  const getTravelerDescription = (travelers) => {
+    const total = travelers.adults + travelers.children + travelers.infants;
+    if (total === 1) return "Only Me";
+
+    let description = `${travelers.adults} Adult${
+      travelers.adults > 1 ? "s" : ""
+    }`;
+    if (travelers.children > 0) {
+      description += `, ${travelers.children} Child${
+        travelers.children > 1 ? "ren" : ""
+      }`;
+    }
+    if (travelers.infants > 0) {
+      description += `, ${travelers.infants} Infant${
+        travelers.infants > 1 ? "s" : ""
+      }`;
+    }
+    return description;
+  };
+
+  const generateAItinerary = async (itineraryData) => {
+    const prompt = `
+      Generate a detailed travel plan for ${itineraryData.destination} for 
+      ${itineraryData.dates.duration} Days and ${
+      itineraryData.dates.totalNights
+    } Nights 
+      for ${itineraryData.travelers.description} with a ${
+      itineraryData.preferences.budget
+    } budget.
+      
+      Trip Type: ${itineraryData.preferences.tripType}
+      Interests: ${itineraryData.preferences.interests.join(", ")}
+      
+      Please create a day-by-day itinerary using the following ${
+        itineraryData.nearbyPlaces.length
+      } places:
+      ${itineraryData.nearbyPlaces
+        .map((place) => `- ${place.name} (Rating: ${place.rating})`)
+        .join("\n")}
+      
+      Requirements:
+      1. Divide the places evenly across ${itineraryData.dates.duration} days
+      2. Each day should start around 10 AM and end by 8 PM
+      3. Group nearby locations together to minimize travel time
+      4. Include lunch breaks at appropriate times
+      5. Consider weather conditions (provide suitable indoor alternatives if rain is expected)
+      6. Ensure the itinerary matches the ${
+        itineraryData.preferences.budget
+      } budget level
+      
+      Output Format (JSON):
+      {
+        "destination": "${itineraryData.destination}",
+        "duration": "${itineraryData.dates.duration} days",
+        "budget": "${itineraryData.preferences.budget}",
+        "travelers": ${JSON.stringify(itineraryData.travelers)},
+        "interests": ${JSON.stringify(itineraryData.preferences.interests)},
+        "dailyItinerary": [
+          {
+            "day": 1,
+            "date": "${itineraryData.dates.start}",
+            "activities": [
+              {
+                "time": "10:00 AM",
+                "place": "Place Name",
+                "type": "Attraction/Activity",
+                "duration": "2 hours",
+                "description": "Brief description",
+                "travelTimeFromPrevious": "15 mins walk",
+                "notes": "Any special notes"
+              },
+              // More activities...
+            ],
+            "lunch": {
+              "time": "1:00 PM",
+              "place": "Restaurant Name",
+              "type": "Lunch",
+              "duration": "1 hour"
+            }
+          },
+          // More days...
+        ],
+        "hotelRecommendations": [
+          {
+            "name": "Hotel Name",
+            "address": "Hotel Address",
+            "priceRange": "$100-$150/night",
+            "rating": 4.5,
+            "budgetMatch": "${itineraryData.preferences.budget}"
+          }
+          // More hotels...
+        ],
+        "transportationTips": "Include any transportation tips here",
+        "additionalNotes": "Any additional notes or recommendations"
+      }
+      
+      Please ensure the itinerary is realistic, enjoyable, and matches the user's preferences.
+      Include estimated travel times between locations and appropriate time allocations.
+    `;
+
+    try {
+      const result = await chatSession.sendMessage(prompt);
+      console.log("AI Response:", result.response.text());
+
+      // Parse the JSON response from the AI
+      const responseText = result.response.text();
+      const jsonStart = responseText.indexOf("{");
+      const jsonEnd = responseText.lastIndexOf("}") + 1;
+      const jsonString = responseText.slice(jsonStart, jsonEnd);
+
+      return JSON.parse(jsonString);
+    } catch (error) {
+      console.error("Error generating AI itinerary:", error);
+      throw new Error("Failed to generate itinerary with AI");
     }
   };
 
@@ -331,7 +491,8 @@ const ReviewSummaryScreen = ({ navigation }) => {
   if (isGenerating) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" />
+        <SkeletonLoading />
+        {/* <ActivityIndicator size="large" /> */}
         <Text style={styles.loadingText}>
           Finding the best places in {toLocation?.name}...
         </Text>

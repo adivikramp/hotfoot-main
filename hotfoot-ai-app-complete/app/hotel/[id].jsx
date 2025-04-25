@@ -28,6 +28,8 @@ import HotelPricingScreen from "./hotelPrice";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import useTripSearchStore from "../store/trpiSearchZustandStore";
 import { getHotel } from "../../services/SerpApi";
+import HotelLoadingSkeleton from "../../components/skeletonLoading/hotelLoadingSkeleton";
+import MapView, { Marker } from "react-native-maps";
 
 const { width, height } = Dimensions.get("window");
 
@@ -89,9 +91,7 @@ export default function Page() {
     return (
       <View style={styles.container}>
         <StatusBar barStyle="dark-content" />
-        <View style={styles.loadingContainer}>
-          <Text>Loading hotel details...</Text>
-        </View>
+        <HotelLoadingSkeleton />
       </View>
     );
   }
@@ -410,7 +410,7 @@ export default function Page() {
         <View style={styles.hotelInfo}>
           <Text style={styles.hotelName}>{hotel.name}</Text>
           <View style={styles.locationContainer}>
-            <MaterialIcons name="location-on" size={18} color="black" />
+            {/* <MaterialIcons name="location-on" size={18} color="black" /> */}
             <Text style={styles.locationText}>
               {hotel.address || "Address not available"}
             </Text>
@@ -582,7 +582,7 @@ export default function Page() {
         </View>
 
         {/* Location Section */}
-        {hotel.gps_coordinates && (
+        {/* {hotel.gps_coordinates && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Location</Text>
@@ -613,11 +613,55 @@ export default function Page() {
                 <MaterialIcons name="location-on" size={28} color="black" />
               </View>
               <View style={styles.mapLocationInfo}>
-                <Text style={styles.mapLocationTitle}>{hotel.name}</Text>
-                <Text style={styles.mapLocationSubtitle}>
-                  {hotel.address || "Address not available"}
-                </Text>
+                <View style={styles.mapLocationContent}>
+                  <Text
+                    style={styles.mapLocationTitle}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                  >
+                    {hotel.name}
+                  </Text>
+                  <Text
+                    style={styles.mapLocationSubtitle}
+                    numberOfLines={2}
+                    ellipsizeMode="tail"
+                  >
+                    {hotel.address || "Address not available"}
+                  </Text>
+                </View>
               </View>
+            </View>
+          </View>
+        )} */}
+
+        {hotel.gps_coordinates && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Location</Text>
+              <TouchableOpacity style={styles.seeAllButton}>
+                <Text style={styles.seeAllText}>Directions</Text>
+                <MaterialIcons name="directions" size={16} color="black" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.mapContainer}>
+              <MapView
+                style={styles.map}
+                initialRegion={{
+                  latitude: hotel.gps_coordinates.latitude,
+                  longitude: hotel.gps_coordinates.longitude,
+                  latitudeDelta: 0.005,
+                  longitudeDelta: 0.005,
+                }}
+              >
+                <Marker
+                  coordinate={{
+                    latitude: hotel.gps_coordinates.latitude,
+                    longitude: hotel.gps_coordinates.longitude,
+                  }}
+                  title={hotel.name}
+                  description={hotel.address}
+                />
+              </MapView>
             </View>
           </View>
         )}
@@ -722,14 +766,14 @@ export default function Page() {
                       />
                     </View>
                   )}
-                  <FlatList
+                  {/* <FlatList
                     data={reviews}
                     renderItem={renderReview}
                     keyExtractor={(item) => item.id}
                     contentContainerStyle={styles.modalContent}
                     showsVerticalScrollIndicator={false}
                     scrollEnabled={false}
-                  />
+                  /> */}
                 </ScrollView>
               </SafeAreaView>
             </Modal>
@@ -767,9 +811,9 @@ export default function Page() {
             </Text>
           </View>
         </View>
-        <TouchableOpacity style={styles.bookButton} activeOpacity={0.8}>
+        {/* <TouchableOpacity style={styles.bookButton} activeOpacity={0.8}>
           <Text style={styles.bookButtonText}>Book Now</Text>
-        </TouchableOpacity>
+        </TouchableOpacity> */}
       </View>
     </View>
   );
@@ -793,7 +837,7 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
     zIndex: 10,
     paddingTop: Platform.OS === "ios" ? 50 : 30,
-    height: 100,
+    height: 80,
   },
   headerContent: {
     flexDirection: "row",
@@ -814,6 +858,8 @@ const styles = StyleSheet.create({
     color: "black",
     fontSize: 18,
     fontWeight: "bold",
+    maxWidth: width * 0.7,
+    overflow: "hidden",
   },
   imageCarousel: {
     height: 360,
@@ -968,6 +1014,9 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: "#64748B",
     marginLeft: 4,
+    flex: 1,
+    flexWrap: "wrap",
+    maxWidth: "90%",
   },
   ratingBadge: {
     position: "absolute",
@@ -1279,6 +1328,8 @@ const styles = StyleSheet.create({
   detailText: {
     fontSize: 15,
     color: "#334155",
+    flex: 1,
+    flexWrap: "wrap",
   },
   descriptionText: {
     fontSize: 15,
@@ -1317,6 +1368,11 @@ const styles = StyleSheet.create({
     color: "#334155",
     textAlign: "center",
   },
+  map: {
+    width: "100%",
+    height: 200,
+    borderRadius: 16,
+  },
   mapContainer: {
     height: 180,
     borderRadius: 16,
@@ -1341,20 +1397,29 @@ const styles = StyleSheet.create({
   mapLocationInfo: {
     position: "absolute",
     bottom: 12,
-    left: 12,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+  },
+  mapLocationContent: {
     backgroundColor: "rgba(255, 255, 255, 0.9)",
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 12,
+    maxWidth: "90%",
+    alignItems: "center",
   },
   mapLocationTitle: {
     fontSize: 14,
     fontWeight: "bold",
     color: "#1E293B",
+    textAlign: "center",
   },
   mapLocationSubtitle: {
     fontSize: 12,
     color: "#64748B",
+    textAlign: "center",
+    marginTop: 2,
   },
   reviewHeaderContainer: {
     flex: 1,
@@ -1496,8 +1561,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 24,
-    paddingVertical: 16,
-    paddingBottom: Platform.OS === "ios" ? 30 : 16,
+    paddingTop: 16,
+    paddingBottom: Platform.OS === "ios" ? 30 : 0,
     borderTopWidth: 1,
     borderTopColor: "#E2E8F0",
     shadowColor: "#000",

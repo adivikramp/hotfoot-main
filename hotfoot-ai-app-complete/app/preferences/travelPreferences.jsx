@@ -1,4 +1,4 @@
-import { SafeAreaView, ScrollView } from "react-native";
+import { SafeAreaView, ScrollView, Alert } from "react-native";
 import React, { useEffect } from "react";
 import ButtonMultiselect, {
   ButtonLayout,
@@ -17,12 +17,7 @@ const TravelPreferences = () => {
   const params = useLocalSearchParams();
   const { userId, getToken } = useAuth();
   const { updatePreferences, userData, fetchUserData } = useUserStore();
-
   const { selectedButtons, setSelectedButtons } = useTravelPreferencesStore();
-
-  // const [selectedButtons, setSelectedButtons] = useState(
-  //   userData?.preferences?.activities || []
-  // );
 
   useEffect(() => {
     const loadUserData = async () => {
@@ -50,8 +45,12 @@ const TravelPreferences = () => {
 
   const handleDone = async () => {
     try {
-      if (!selectedButtons || selectedButtons.length === 0) {
-        alert("Please select at least one preference");
+      if (!selectedButtons || selectedButtons.length < 5) {
+        Alert.alert(
+          "Selection Required",
+          "Please select at least 5 preferences to continue.",
+          [{ text: "OK" }]
+        );
         return;
       }
 
@@ -75,7 +74,7 @@ const TravelPreferences = () => {
       }
     } catch (error) {
       console.error("Error saving preferences:", error);
-      alert("Failed to save preferences. Please try again.");
+      Alert.alert("Error", "Failed to save preferences. Please try again.");
     }
   };
 
@@ -97,7 +96,14 @@ const TravelPreferences = () => {
           multiselect={true}
         />
       </ScrollView>
-      <BottomBarContinueBtn handleDone={handleDone} />
+      <BottomBarContinueBtn
+        handleDone={handleDone}
+        disabled={selectedButtons?.length < 5}
+        showCounter={true}
+        currentCount={selectedButtons?.length || 0}
+        minRequired={5}
+        buttonText="Continue"
+      />
     </SafeAreaView>
   );
 };

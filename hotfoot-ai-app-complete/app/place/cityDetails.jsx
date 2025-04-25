@@ -31,6 +31,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import useTripSearchStore from "../store/trpiSearchZustandStore";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { HotelCardResults } from "../../components/hotelCard/hotelCardResults";
+import SkeletonLoading from "../../components/skeletonLoading/skeletonLoading";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const HEADER_HEIGHT = 350;
@@ -52,8 +53,7 @@ export default function ExploreScreen() {
   const [error, setError] = useState(null);
   const scrollY = useSharedValue(0);
   const router = useRouter();
-  const { toLocation, fromLocation, travelers, getTotalTravelers, dates } =
-    useTripSearchStore();
+  const { toLocation, fromLocation, dates } = useTripSearchStore();
 
   const formatTime = (timeString) => {
     if (!timeString) return "--:--";
@@ -274,7 +274,7 @@ export default function ExploreScreen() {
 
             {/* Flight Options */}
             {loading ? (
-              <ActivityIndicator size="large" style={{ marginVertical: 20 }} />
+              <SkeletonLoading />
             ) : error ? (
               <Text style={styles.errorText}>{error}</Text>
             ) : flightData?.best_flights?.length > 0 ? (
@@ -289,14 +289,18 @@ export default function ExploreScreen() {
               style={styles.viewMoreButton}
               onPress={() =>
                 router.push({
-                  pathname: "/flightDetails/index",
+                  pathname: "/flightDetails",
+                  // params: {
+                  //   fromLocation: JSON.stringify(fromLocation),
+                  //   toLocation: JSON.stringify(toLocation),
+                  //   dates: JSON.stringify(dates),
+                  //   travelers: JSON.stringify(travelers),
+                  //   cabinClass,
+                  //   tripType,
+                  // },
                   params: {
-                    fromLocation: JSON.stringify(fromLocation),
-                    toLocation: JSON.stringify(toLocation),
-                    dates: JSON.stringify(dates),
-                    travelers: JSON.stringify(travelers),
-                    cabinClass,
-                    tripType,
+                    flightResults: JSON.stringify(flightData),
+                    searchData: JSON.stringify(flightSearchParams),
                   },
                 })
               }
@@ -322,7 +326,7 @@ export default function ExploreScreen() {
             </Text>
 
             <View style={styles.stayTypes}>
-              {["Hotels", "Holiday rentals"].map((type, index) => (
+              {["Hotels" /*, "Holiday rentals" */].map((type, index) => (
                 <TouchableOpacity
                   key={type}
                   onPress={() => setSelectedTab(tab)}
@@ -543,9 +547,9 @@ export default function ExploreScreen() {
               ))}
             </View>
 
-            <TouchableOpacity style={styles.viewMoreButton}>
+            {/* <TouchableOpacity style={styles.viewMoreButton}>
               <Text style={styles.viewMoreText}>View more questions</Text>
-            </TouchableOpacity>
+            </TouchableOpacity> */}
           </View>
         </View>
       </Animated.ScrollView>

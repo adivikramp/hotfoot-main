@@ -58,6 +58,8 @@ export const searchOutboundFlights = async (params) => {
     travel_class: travelClassMap[params.travelClass?.toLowerCase()] || 1,
     currency: params.currency || "USD",
     type: typeClassMap[params.tripType] || 1,
+    show_hidden: true,
+    deep_search: true,
   };
 
   if (params.tripType === "Round Trip" && params.returnDate) {
@@ -76,6 +78,8 @@ export const getReturnFlights = async (params) => {
     outbound_date: params.outboundDate,
     return_date: params.returnDate,
     departure_token: params.departureToken,
+    show_hidden: true,
+    deep_search: true,
   });
 };
 

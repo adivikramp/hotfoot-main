@@ -12,6 +12,7 @@ import { Star } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
+import SkeletonLoading from "../skeletonLoading/skeletonLoading";
 
 export const HotelCardResults = ({ hotel, searchParams }) => {
   const router = useRouter();
@@ -41,7 +42,8 @@ export const HotelCardResults = ({ hotel, searchParams }) => {
   };
 
   if (loading) {
-    return <ActivityIndicator size="large" color="#0000ff" />;
+    // return <ActivityIndicator size="large" color="#0000ff" />;
+    return <SkeletonLoading />;
   }
 
   if (!hotel) {

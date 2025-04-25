@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, Alert } from "react-native";
+import { View, Text, StyleSheet, Alert, TouchableOpacity } from "react-native";
 import * as Location from "expo-location";
 import useUserStore from "../store/userZustandStore";
 import { useNavigation } from "expo-router";
@@ -50,8 +50,8 @@ const LocationPermission = () => {
           city: firstAddress.city || "Unknown city",
           country: firstAddress.country || "Unknown country",
         });
-        navigation.navigate("preferences/allSet");
       }
+      navigation.navigate("preferences/allSet");
     } catch (error) {
       console.error("Error getting location:", error);
       Alert.alert(
@@ -63,6 +63,11 @@ const LocationPermission = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSkip = () => {
+    setLocationPermission("denied");
+    navigation.navigate("preferences/allSet");
   };
 
   return (
@@ -80,6 +85,11 @@ const LocationPermission = () => {
         {isLoading && <ActivityIndicator size="large" color="#0000ff" />}
       </View>
 
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
+          <Text style={styles.skipButtonText}>Skip for now</Text>
+        </TouchableOpacity>
+      </View>
       <BottomBarContinueBtn handleDone={handleDone} />
     </SafeAreaView>
   );
@@ -105,6 +115,22 @@ const styles = StyleSheet.create({
     marginBottom: 30,
     color: "#666",
     paddingHorizontal: 20,
+  },
+  buttonContainer: {
+    paddingHorizontal: 20,
+  },
+  skipButton: {
+    padding: 15,
+    borderRadius: 15,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#000",
+    marginVertical: 2,
+  },
+  skipButtonText: {
+    fontSize: 16,
+    color: "#000",
+    fontWeight: "600",
   },
 });
 

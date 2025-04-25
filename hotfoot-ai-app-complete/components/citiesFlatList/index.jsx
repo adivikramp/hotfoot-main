@@ -383,28 +383,19 @@ export const ExploreFlatList = ({ category, onLoading }) => {
     },
   };
 
-  // onLoading(true)
   useEffect(() => {
-    // console.log('category:', hotelDetails);
     fetchData();
-    // setTimeout(() => {
-
-    //     onLoading(false);
-    // }, 2000);
   }, [category]);
 
   const fetchData = async () => {
     try {
       if (category === "hotel") {
         setPlaces(hotelDetails.properties);
-
-        // console.log('popularDestinations:', hotelDetails.properties);
       } else {
         const popularDestinations = await GetPlaceDetails(body);
 
         setPlaces(popularDestinations.places);
       }
-      // console.log('popularDestinations:', popularDestinations.places);
     } catch (error) {
       console.error("Error during ExploreFlatList city list:", error);
     }
@@ -412,7 +403,7 @@ export const ExploreFlatList = ({ category, onLoading }) => {
 
   const renderItem = ({ item }) =>
     category?.toString() === "hotel" ? (
-      <View className="p-3">
+      <View className="py-1 px-2">
         <HotelCard hotel={item} />
       </View>
     ) : (
