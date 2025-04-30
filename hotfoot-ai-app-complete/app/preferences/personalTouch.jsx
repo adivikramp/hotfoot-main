@@ -3,14 +3,13 @@ import {
   Text,
   SafeAreaView,
   StyleSheet,
-  TouchableOpacity,
   ScrollView,
   TextInput,
   Image,
   ActivityIndicator,
 } from "react-native";
 import React, { useEffect, useState } from "react";
-import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useForm, Controller } from "react-hook-form";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import CountryPickerComponent from "../../components/countryPicker";
@@ -18,12 +17,13 @@ import TopBar from "../../components/topBar";
 import BottomBarContinueBtn from "../../components/buttons/bottomBarContinueBtn";
 import TitleSubtitle from "../../components/titleSubtitle";
 import useUserStore from "../store/userZustandStore";
-import { useAuth } from "@clerk/clerk-expo";
+import { useAuth, useUser } from "@clerk/clerk-expo";
 
 const PersonalTouch = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { userId, getToken } = useAuth();
+  const { user } = useUser();
   const { userData, updatePersonalInfo, fetchUserData, loading } =
     useUserStore();
   const [countryCode, setCountryCode] = useState("");
@@ -44,6 +44,7 @@ const PersonalTouch = () => {
     mode: "onChange",
   });
 
+  // Fetch user data from Firestore when component mounts
   useEffect(() => {
     const loadData = async () => {
       if (userId) {
@@ -53,12 +54,14 @@ const PersonalTouch = () => {
     loadData();
   }, [userId]);
 
+  // Update form with Clerk user data or Firestore user data
   useEffect(() => {
     if (userData) {
+      // Prioritize Firestore data if available
       reset({
-        firstName: userData.firstName || "",
-        lastName: userData.lastName || "",
-        email: userData.email || "",
+        firstName: userData.firstName || user?.firstName || "",
+        lastName: userData.lastName || user?.lastName || "",
+        email: userData.email || user?.primaryEmailAddress?.emailAddress || "",
         phoneNumber:
           userData.personalInfo?.phoneNumber
             ?.replace(/[^\d]/g, "")
@@ -82,8 +85,16 @@ const PersonalTouch = () => {
           name: userData.personalInfo.nationality || "",
         });
       }
+    } else if (user) {
+      // Use Clerk data if no Firestore data exists
+      reset({
+        firstName: user.firstName || "",
+        lastName: user.lastName || "",
+        email: user.primaryEmailAddress?.emailAddress || "",
+        phoneNumber: "",
+      });
     }
-  }, [userData]);
+  }, [userData, user, reset]);
 
   const handleCountrySelect = (selectedCountry) => {
     setCountryCode(selectedCountry?.cca2);
@@ -104,6 +115,8 @@ const PersonalTouch = () => {
         phoneNumber: fullPhoneNumber,
         countryCode: country?.cca2 || "",
       };
+
+      console.log("personalInfo to be saved:", personalInfo);
 
       await updatePersonalInfo(userId, getToken, personalInfo);
 
@@ -145,12 +158,16 @@ const PersonalTouch = () => {
             <View>
               <Image
                 style={styles.image}
-                source={require("../../assets/images/icon.png")}
+                source={
+                  user?.imageUrl
+                    ? { uri: user.imageUrl }
+                    : require("../../assets/images/icon.png")
+                }
               />
-              <Image
+              {/* <Image
                 style={styles.imageEditIcon}
                 source={require("../../assets/images/edit-icon.png")}
-              />
+              /> */}
             </View>
           </View>
 

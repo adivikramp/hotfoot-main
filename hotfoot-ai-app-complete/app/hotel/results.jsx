@@ -97,7 +97,11 @@ export default function HotelSearchResultsScreen() {
   };
 
   const renderHotelItem = ({ item }) => (
-    <HotelCardResults hotel={item} searchParams={JSON.parse(searchData)} />
+    <HotelCardResults
+      hotel={item}
+      searchParams={JSON.parse(searchData)}
+      amenities={item.amenities || []}
+    />
   );
 
   const renderFooter = () => {

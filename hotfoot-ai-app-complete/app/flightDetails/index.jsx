@@ -31,7 +31,7 @@ const FlightDetails = () => {
           parsedData = params.flightResults;
         } else if (typeof params.flightResults === "string") {
           parsedData = JSON.parse(params.flightResults);
-          console.log("Parsed flight results:", parsedData);
+          console.log("Parsed flight results:", JSON.stringify(parsedData, null, 2));
         } else {
           throw new Error("Invalid flight results format");
         }

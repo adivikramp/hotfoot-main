@@ -120,7 +120,7 @@ const TabLayout = () => {
           ),
         }}
       />
-      <Tabs.Screen
+      {/* <Tabs.Screen
         name="messages"
         options={{
           headerShown: false,
@@ -157,7 +157,7 @@ const TabLayout = () => {
             />
           ),
         }}
-      />
+      /> */}
       <Tabs.Screen
         name="settings"
         options={{

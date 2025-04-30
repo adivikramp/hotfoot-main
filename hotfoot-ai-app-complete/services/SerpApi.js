@@ -238,3 +238,27 @@ export const formatHotelSearchParams = (searchData) => {
 
   return params;
 };
+
+/* ------------------------------------- REVIEWS FUNCTIONS ------------------------------------- */
+export const getGoogleMapsPlace = async (params) => {
+  const apiParams = {
+    engine: "google_maps",
+    type: "search",
+    google_domain: "google.com",
+    q: params.query,
+    ll: `@${params.latitude},${params.longitude},14z`,
+    hl: "en",
+  };
+
+  return makeApiCall(apiParams);
+};
+
+export const getGoogleMapsReviews = async (params) => {
+  const apiParams = {
+    engine: "google_maps_reviews",
+    hl: "en",
+    place_id: params.placeId,
+  };
+
+  return makeApiCall(apiParams);
+};

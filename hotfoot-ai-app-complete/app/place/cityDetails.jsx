@@ -55,12 +55,6 @@ export default function ExploreScreen() {
   const router = useRouter();
   const { toLocation, fromLocation, dates } = useTripSearchStore();
 
-  const formatTime = (timeString) => {
-    if (!timeString) return "--:--";
-    const date = new Date(timeString);
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  };
-
   const formatDuration = (minutes) => {
     if (!minutes) return "";
     const hours = Math.floor(minutes / 60);
@@ -194,17 +188,31 @@ export default function ExploreScreen() {
           <Text style={styles.priceText}>${flight.price}</Text>
           <Text style={styles.priceSubtext}>{flight.type}</Text>
         </View>
+        <TouchableOpacity
+          style={styles.viewMoreButton}
+          onPress={() =>
+            router.push({
+              pathname: "/flightDetails",
+              params: {
+                flightResults: JSON.stringify(flightData),
+                searchData: JSON.stringify(flightSearchParams),
+              },
+            })
+          }
+        >
+          <Text style={styles.viewMoreText}>View all flights</Text>
+        </TouchableOpacity>
       </MotiView>
     );
   };
 
-  const questions = [
-    "Is Dublin worth visiting?",
-    "Is Dublin an expensive place to visit?",
-    "What to do in Ireland in 3 days?",
-    "What to know before going to Dublin?",
-    "Where to visit from Dublin?",
-  ];
+  // const questions = [
+  //   "Is Dublin worth visiting?",
+  //   "Is Dublin an expensive place to visit?",
+  //   "What to do in Ireland in 3 days?",
+  //   "What to know before going to Dublin?",
+  //   "Where to visit from Dublin?",
+  // ];
 
   const weatherData = [
     { month: "March", high: "11°", low: "4°", popularity: 60 },
@@ -284,29 +292,6 @@ export default function ExploreScreen() {
                 No flights found for your dates
               </Text>
             )}
-
-            <TouchableOpacity
-              style={styles.viewMoreButton}
-              onPress={() =>
-                router.push({
-                  pathname: "/flightDetails",
-                  // params: {
-                  //   fromLocation: JSON.stringify(fromLocation),
-                  //   toLocation: JSON.stringify(toLocation),
-                  //   dates: JSON.stringify(dates),
-                  //   travelers: JSON.stringify(travelers),
-                  //   cabinClass,
-                  //   tripType,
-                  // },
-                  params: {
-                    flightResults: JSON.stringify(flightData),
-                    searchData: JSON.stringify(flightSearchParams),
-                  },
-                })
-              }
-            >
-              <Text style={styles.viewMoreText}>View all flights</Text>
-            </TouchableOpacity>
           </MotiView>
 
           {/* Stays Section */}
@@ -461,7 +446,7 @@ export default function ExploreScreen() {
           </MotiView>
 
           {/* FAQ Section */}
-          <View style={styles.section}>
+          {/* <View style={styles.section}>
             <Text style={styles.sectionTitle}>What people ask</Text>
             <Text style={styles.sectionSubtitle}>
               See popular questions from Google Search
@@ -547,10 +532,10 @@ export default function ExploreScreen() {
               ))}
             </View>
 
-            {/* <TouchableOpacity style={styles.viewMoreButton}>
+            <TouchableOpacity style={styles.viewMoreButton}>
               <Text style={styles.viewMoreText}>View more questions</Text>
-            </TouchableOpacity> */}
-          </View>
+            </TouchableOpacity>
+          </View> */}
         </View>
       </Animated.ScrollView>
       <TouchableOpacity
@@ -631,8 +616,8 @@ const styles = StyleSheet.create({
   section: {
     // borderRadius: 54,
     padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
+    // borderBottomWidth: 1,
+    // borderBottomColor: "#e0e0e0",
   },
   sectionHeader: {
     flexDirection: "row",
@@ -1006,6 +991,8 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginVertical: 20,
     color: "#666",
+    fontSize: 16,
+    fontWeight: "600",
   },
   listContainer: {
     padding: 16,
@@ -1013,11 +1000,6 @@ const styles = StyleSheet.create({
   noResultsContainer: {
     padding: 32,
     alignItems: "center",
-  },
-  noResultsText: {
-    fontSize: 18,
-    fontWeight: "600",
-    marginBottom: 8,
   },
   noResultsSubtext: {
     fontSize: 14,

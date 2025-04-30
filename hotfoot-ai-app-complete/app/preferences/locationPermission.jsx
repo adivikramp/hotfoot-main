@@ -8,10 +8,13 @@ import TopBar from "../../components/topBar";
 import BottomBarContinueBtn from "../../components/buttons/bottomBarContinueBtn";
 import { MapPin } from "lucide-react-native";
 import { ActivityIndicator } from "react-native";
+import { useAuth } from "@clerk/clerk-expo";
 
 const LocationPermission = () => {
   const navigation = useNavigation();
-  const { setUserLocation, setLocationPermission } = useUserStore();
+  const { userId, getToken } = useAuth();
+  const { setUserLocation, setLocationPermission, updateUserLocation } =
+    useUserStore();
   const [isLoading, setIsLoading] = useState(false);
 
   const handleDone = async () => {
@@ -40,17 +43,19 @@ const LocationPermission = () => {
         longitude: location.coords.longitude,
       });
 
-      if (address.length > 0) {
-        const firstAddress = address[0];
-        setUserLocation({
-          coordinates: {
-            latitude: location.coords.latitude,
-            longitude: location.coords.longitude,
-          },
-          city: firstAddress.city || "Unknown city",
-          country: firstAddress.country || "Unknown country",
-        });
-      }
+      const userLocation = {
+        coordinates: {
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+        },
+        city: address[0]?.city || "Unknown city",
+        country: address[0]?.country || "Unknown country",
+      };
+
+      // Save to Zustand store and Firestore
+      setUserLocation(userLocation);
+      await updateUserLocation(userId, getToken, userLocation);
+
       navigation.navigate("preferences/allSet");
     } catch (error) {
       console.error("Error getting location:", error);
@@ -85,11 +90,6 @@ const LocationPermission = () => {
         {isLoading && <ActivityIndicator size="large" color="#0000ff" />}
       </View>
 
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
-          <Text style={styles.skipButtonText}>Skip for now</Text>
-        </TouchableOpacity>
-      </View>
       <BottomBarContinueBtn handleDone={handleDone} />
     </SafeAreaView>
   );

@@ -184,14 +184,6 @@ const UnifiedSearchForm = ({ activeTab, onClose }) => {
   // Common state for all tabs
   const [fromLocation, setFromLocation] = useState(null);
   const [toLocation, setToLocation] = useState(null);
-  // const [fromLocation, setFromLocation] = useState({
-  //   name: "London",
-  //   code: "LHR",
-  // });
-  // const [toLocation, setToLocation] = useState({
-  //   name: "Mumbai",
-  //   code: "BOM",
-  // });
   const [dates, setDates] = useState({ startDate: null, endDate: null });
   const [travelers, setTravelers] = useState({
     adults: 1,
@@ -283,7 +275,7 @@ const UnifiedSearchForm = ({ activeTab, onClose }) => {
   const [currentField, setCurrentField] = useState(null); // 'from' or 'to'
 
   // Trip types and cabin classes
-  const tripTypes = ["Round Trip", "One Way", "Multi-City"];
+  const tripTypes = ["Round Trip", "One Way" /*"Multi-City"*/];
   const cabinClasses = ["Economy", "Business", "First"];
 
   // Reset end date when switching to one-way trip
@@ -321,16 +313,6 @@ const UnifiedSearchForm = ({ activeTab, onClose }) => {
     setIsModalVisible(true);
     setIsTravelersDropdownOpen(false);
   };
-
-  // Handle date selection (simulated)
-  // const handleDateSelect = () => {
-  //     setIsTravelersDropdownOpen(false);
-  //     if (tripType === 'One Way') {
-  //         setDates({ startDate: 'Mar 25, 2025', endDate: null });
-  //     } else {
-  //         setDates({ startDate: 'Mar 25, 2025', endDate: 'Apr 01, 2025' });
-  //     }
-  // };
 
   // Toggle travelers dropdown
   const handleTravelersPress = () => {
@@ -395,8 +377,6 @@ const UnifiedSearchForm = ({ activeTab, onClose }) => {
   // Handle search button press
   const handleSearch = async () => {
     setIsTravelersDropdownOpen(false);
-    // alert(`${activeTab} search initiated!`);
-    // Set all parameters in the Zustand store
     setFromLocationToStore(fromLocation);
     setToLocationToStore(toLocation);
     setDatesToStore(dates);
@@ -782,6 +762,7 @@ const styles = StyleSheet.create({
   },
   tripTypeContainer: {
     flexDirection: "row",
+    justifyContent: "center",
     padding: 20,
     gap: 10,
   },

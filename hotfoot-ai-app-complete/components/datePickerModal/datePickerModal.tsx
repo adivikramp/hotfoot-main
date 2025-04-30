@@ -113,7 +113,7 @@ export default function DatePickerModal({
                   minDate={new Date()}
                   maxRangeDuration={(activeTab === 'Flights' ? 9 : undefined) || (activeTab === 'Places' ? 13 : undefined)}
                   selectedRangeStyle={{
-                    backgroundColor: '#32B37D'
+                    backgroundColor: 'black'
                   }}
                   selectedDayTextStyle={{ color: 'white' }}
                 />

@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
+  Linking,
 } from "react-native";
 import { Dimensions } from "react-native";
 import { GetPixabayImageByCityName } from "../../services/PixabayApi";
@@ -30,6 +31,9 @@ import * as Haptics from "expo-haptics";
 import { useNavigation } from "expo-router";
 import useTripSearchStore from "../../app/store/trpiSearchZustandStore";
 import DatePickerModal from "../datePickerModal/datePickerModal";
+import useUserStore from "../../app/store/userZustandStore";
+import SkeletonLoading from "../skeletonLoading/skeletonLoading";
+import { formatHotelSearchParams, searchHotels } from "../../services/SerpApi";
 
 const fetchCitiesWithImages = async (data) => {
   // if (!data) return;
@@ -63,19 +67,55 @@ export const CityList = ({ data }) => {
   const navigation = useNavigation();
   const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
   const {
+    toLocation,
+    travelers,
     setFromLocationToStore,
     setToLocationToStore,
     setDatesToStore,
     resetSearch,
   } = useTripSearchStore();
 
-  const handleDateConfirm = (selectedDates) => {
+  const handleDateConfirm = async (selectedDates) => {
     console.log("selectedDates:", selectedDates);
     setDatesToStore({
       startDate: selectedDates.startDate,
       endDate: selectedDates.endDate,
     });
-    navigation.navigate("place/cityDetails");
+    const searchDataHotels = {
+      dates: {
+        startDate: selectedDates.startDate,
+        endDate: selectedDates.endDate,
+        totalDays: selectedDates.totalDays,
+      },
+      toLocation,
+      travelers,
+    };
+
+    console.log(searchDataHotels);
+
+    try {
+      const apiParams = formatHotelSearchParams(searchDataHotels);
+      const hotelResults = await searchHotels(apiParams);
+      navigation.navigate("place/cityDetails", {
+        hotelResults: JSON.stringify(hotelResults),
+        searchData: JSON.stringify({
+          ...apiParams,
+          check_in_date: formatDateForAPI(selectedDates.startDate),
+          check_out_date: formatDateForAPI(selectedDates.endDate),
+        }),
+      });
+      onClose();
+    } catch (error) {
+      console.error("Hotel search error:", error);
+      Alert.alert("Error", "Failed to search for hotels. Please try again.");
+    }
+  };
+
+  const formatDateForAPI = (dateString) => {
+    const date = new Date(dateString);
+    return `${date.getFullYear()}-${(date.getMonth() + 1)
+      .toString()
+      .padStart(2, "0")}-${date.getDate().toString().padStart(2, "0")}`;
   };
 
   const handlePress = ({ toLocation }) => {
@@ -178,19 +218,55 @@ export const TopPicksCityList = ({ data }) => {
   const navigation = useNavigation();
   const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
   const {
+    toLocation,
+    travelers,
     setFromLocationToStore,
     setToLocationToStore,
     setDatesToStore,
     resetSearch,
   } = useTripSearchStore();
 
-  const handleDateConfirm = (selectedDates) => {
+  const handleDateConfirm = async (selectedDates) => {
     console.log("selectedDates:", selectedDates);
     setDatesToStore({
       startDate: selectedDates.startDate,
       endDate: selectedDates.endDate,
     });
-    navigation.navigate("place/cityDetails");
+    const searchDataHotels = {
+      dates: {
+        startDate: selectedDates.startDate,
+        endDate: selectedDates.endDate,
+        totalDays: selectedDates.totalDays,
+      },
+      toLocation,
+      travelers,
+    };
+
+    console.log(searchDataHotels);
+
+    try {
+      const apiParams = formatHotelSearchParams(searchDataHotels);
+      const hotelResults = await searchHotels(apiParams);
+      navigation.navigate("place/cityDetails", {
+        hotelResults: JSON.stringify(hotelResults),
+        searchData: JSON.stringify({
+          ...apiParams,
+          check_in_date: formatDateForAPI(selectedDates.startDate),
+          check_out_date: formatDateForAPI(selectedDates.endDate),
+        }),
+      });
+      onClose();
+    } catch (error) {
+      console.error("Hotel search error:", error);
+      Alert.alert("Error", "Failed to search for hotels. Please try again.");
+    }
+  };
+
+  const formatDateForAPI = (dateString) => {
+    const date = new Date(dateString);
+    return `${date.getFullYear()}-${(date.getMonth() + 1)
+      .toString()
+      .padStart(2, "0")}-${date.getDate().toString().padStart(2, "0")}`;
   };
 
   const handlePress = ({ toLocation }) => {
@@ -202,7 +278,6 @@ export const TopPicksCityList = ({ data }) => {
     setIsDatePickerVisible(true);
   };
 
-  // console.log('TopPicksCityList console.log: ', cities)
   useEffect(() => {
     fetchData();
   }, []);
@@ -210,7 +285,6 @@ export const TopPicksCityList = ({ data }) => {
   const fetchData = async () => {
     try {
       const topPicks = await TopPicksOnlyForYou();
-      // console.log('TopPicksOnlyForYou:',topPicks);
       const citiesWithImages = await fetchCitiesWithImages(topPicks.data.data);
       setCities(citiesWithImages);
     } catch (error) {
@@ -219,10 +293,6 @@ export const TopPicksCityList = ({ data }) => {
   };
 
   const renderItem = ({ item }) => {
-    // const data = GetPixabayImageByCityName(item.name)
-
-    // console.log('GetPixabayImageByCityName console.log: ', data)
-
     return (
       <ScrollView
         horizontal
@@ -366,7 +436,10 @@ export const ExploreFlatList = ({ category, onLoading }) => {
   const [places, setPlaces] = useState([]);
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const { userLocation } = useUserStore();
   const width = Dimensions.get("window").width;
+
+  const centerCoordinates = userLocation?.coordinates || fallbackCoordinates;
 
   // types for google api
   const body = {
@@ -375,14 +448,15 @@ export const ExploreFlatList = ({ category, onLoading }) => {
     locationRestriction: {
       circle: {
         center: {
-          latitude: 51.50887172852202,
-          longitude: -0.13662853272365194,
+          latitude: centerCoordinates.latitude,
+          longitude: centerCoordinates.longitude,
         },
         radius: 15000,
       },
     },
   };
 
+  // onLoading(true)
   useEffect(() => {
     fetchData();
   }, [category]);
@@ -401,69 +475,61 @@ export const ExploreFlatList = ({ category, onLoading }) => {
     }
   };
 
-  const renderItem = ({ item }) =>
-    category?.toString() === "hotel" ? (
-      <View className="py-1 px-2">
+  const renderItem = ({ item }) => {
+    const handlePlacePress = () => {
+      if (category?.toString() !== "hotel") {
+        const url = `https://www.google.com/maps/search/?api=1&query=${item.location.latitude},${item.location.longitude}`;
+        Linking.openURL(url).catch((err) =>
+          console.error("Failed to open Google Maps:", err)
+        );
+      }
+    };
+
+    return category?.toString() === "hotel" ? (
+      <View>
         <HotelCard hotel={item} />
       </View>
     ) : (
-      <View className="p-3">
-        <Link
-          href={{
-            pathname: `/${category}/${item?.id}`,
-            params: {
-              name: item?.displayName?.text,
-              phoneNumber: item?.internationalPhoneNumber,
-              latitude: item?.location?.latitude,
-              longitude: item?.location?.longitude,
-            },
-          }}
-          asChild
-        >
-          <TouchableOpacity className="rounded-xl bg-white p-3 shadow-lg hover:shadow-xl">
-            {item.photos && item.photos.length > 0 && (
-              <View>
-                <Image
-                  source={{
-                    uri: `https://maps.googleapis.com/maps/api/place/photo?maxwidth=1000&photoreference=${
-                      item.photos[0].name.split("/photos/")[1]
-                    }&key=${process.env.EXPO_PUBLIC_GOOGLE_PLACE_API_KEY}`,
-                  }}
-                  style={{
-                    width: Dimensions.get("window").width - 35,
-                    height: 200,
-                    borderRadius: 10,
-                    objectFit: "none",
-                  }}
-                  className="object-contain"
-                />
-                <View style={styles.ratingContainer}>
-                  <Text style={styles.ratingText}>
-                    ★ {item.rating || "N/A"}
-                  </Text>
-                </View>
-              </View>
-            )}
-            <View style={{ marginVertical: 5, marginLeft: 2 }}>
-              <View style={styles.container}>
-                {/* Display Name */}
-                <Text style={styles.displayName}>
-                  {item?.displayName?.text || "Unknown Place"}
-                </Text>
-
-                {/* Address */}
-                {item.formattedAddress && (
-                  <View>
-                    <Text style={styles.address}>{item.formattedAddress}</Text>
-                    <Text style={styles.address}>Category: {category}</Text>
-                  </View>
-                )}
+      <View>
+        <TouchableOpacity onPress={handlePlacePress}>
+          {item.photos && item.photos.length > 0 && (
+            <View>
+              <Image
+                source={{
+                  uri: `https://maps.googleapis.com/maps/api/place/photo?maxwidth=1000&photoreference=${
+                    item.photos[0].name.split("/photos/")[1]
+                  }&key=${process.env.EXPO_PUBLIC_GOOGLE_PLACE_API_KEY}`,
+                }}
+                style={{
+                  width: Dimensions.get("window").width - 35,
+                  height: 200,
+                  borderRadius: 10,
+                  objectFit: "none",
+                }}
+                className="object-contain"
+              />
+              <View style={styles.ratingContainer}>
+                <Text style={styles.ratingText}>★ {item.rating || "N/A"}</Text>
               </View>
             </View>
-          </TouchableOpacity>
-        </Link>
+          )}
+          <View style={{ marginVertical: 5, marginLeft: 2 }}>
+            <View style={styles.container}>
+              <Text style={styles.displayName}>
+                {item?.displayName?.text || <SkeletonLoading />}
+              </Text>
+              {item.formattedAddress && (
+                <View>
+                  <Text style={styles.address}>{item.formattedAddress}</Text>
+                  <Text style={styles.address}>Category: {category}</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        </TouchableOpacity>
       </View>
     );
+  };
 
   return (
     <View className="flex-1">
@@ -669,7 +735,7 @@ const styles = StyleSheet.create({
     color: "#fff",
     marginLeft: 4,
   },
-  ratingContainer: {
+  ratingStarContainer: {
     flexDirection: "row",
     alignItems: "center",
   },

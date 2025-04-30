@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  ActivityIndicator,
   SafeAreaView,
   Modal,
 } from "react-native";
@@ -26,14 +27,14 @@ const PlaceAutocomplete = ({
   const handleCitySelect = (data, details) => {
     if (details) {
       console.log("Selected city data:", details);
-
+      // console.log("Selected city details:", details);
       setLoading(true);
 
       // Extract city code from address components if available
       let cityCode = "";
       if (details.address_components) {
         const airportComponent = details.address_components.find((component) =>
-          component.types.includes("airport")
+          component.types.includes("iata")
         );
         if (airportComponent) {
           cityCode = airportComponent.short_name;
@@ -105,7 +106,8 @@ const PlaceAutocomplete = ({
           autoFocus={true}
           returnKeyType={"search"}
           fetchDetails={true}
-          listViewDisplayed={true}
+          listViewDisplayed={false}
+          keepResultsAfterBlur={true}
           styles={{
             container: {
               flex: 1,
@@ -200,6 +202,7 @@ const styles = StyleSheet.create({
   modalContainer: {
     flex: 1,
     backgroundColor: "white",
+    height: "100%",
   },
   modalHeader: {
     flexDirection: "row",

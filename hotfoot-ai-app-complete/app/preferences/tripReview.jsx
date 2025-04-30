@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
 import { AntDesign, Ionicons } from "@expo/vector-icons";
 import useTripSearchStore from "../store/trpiSearchZustandStore";
 import useTravelPreferencesStore from "../store/travelPreferencesZustandStore";
+import useItineraryStore from "../store/itineraryZustandStore";
 import TopBar from "../../components/topBar";
 import BottomBarContinueBtn from "../../components/buttons/bottomBarContinueBtn";
 import { useRouter } from "expo-router";
@@ -20,12 +21,15 @@ import DatePickerModal from "../../components/datePickerModal/datePickerModal";
 import { GetPlaceDetails } from "../../services/GlobalApi";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import SkeletonLoading from "../../components/skeletonLoading/skeletonLoading";
+import { db } from "../../config/firebaseConfig";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { useUser } from "@clerk/clerk-expo";
 
 const apiKey = process.env.EXPO_PUBLIC_GOOGLE_GEMINI_API_KEY;
 const genAI = new GoogleGenerativeAI(apiKey);
 
 const model = genAI.getGenerativeModel({
-  model: "gemini-2.0-flash",
+  model: "gemini-1.5-flash",
 });
 
 const generationConfig = {
@@ -170,9 +174,12 @@ const TravelersDropdown = ({ travelers, setTravelers }) => {
   );
 };
 
-const ReviewSummaryScreen = ({ navigation }) => {
+const ReviewSummaryScreen = () => {
   const router = useRouter();
+  const { user } = useUser();
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
+  const [isTravelersDropdownOpen, setIsTravelersDropdownOpen] = useState(false);
 
   const {
     fromLocation,
@@ -184,70 +191,48 @@ const ReviewSummaryScreen = ({ navigation }) => {
     setTravelersToStore,
   } = useTripSearchStore();
   const { selectedButtons, budgetPreference } = useTravelPreferencesStore();
-
-  const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
-  const [isTravelersDropdownOpen, setIsTravelersDropdownOpen] = useState(false);
-
-  const updateTravelerCount = (type, increment) => {
-    const newCount = increment ? travelers[type] + 1 : travelers[type] - 1;
-    if (newCount < 0) return;
-    if (type === "adults" && newCount === 0) return;
-    if (type === "infants" && newCount > travelers.adults) return;
-
-    const updatedTravelers = {
-      ...travelers,
-      [type]: newCount,
-    };
-    setTravelersToStore(updatedTravelers);
-  };
-
-  // Handle date confirmation
-  const handleDateConfirm = (selectedDates) => {
-    setDatesToStore({
-      startDate: selectedDates.startDate,
-      endDate: selectedDates.endDate,
-    });
-    setIsDatePickerVisible(false);
-  };
-
-  // const handleEditInterests = () => {
-  //   router.push({
-  //     pathname: "/preferences/travelPreferences",
-  //     params: {
-  //       returnPath: "/preferences/tripReview",
-  //       flow: "review",
-  //     },
-  //   });
-  // };
-
-  // const handleEditBudget = () => {
-  //   router.push({
-  //     pathname: "/preferences/budgetSelection",
-  //     params: { returnPath: "/preferences/tripReview" },
-  //   });
-  // };
+  const { setGeneratedPlaces, setGeneratedItinerary, setTripParameters } =
+    useItineraryStore();
 
   const generateTrip = async () => {
+    if (!user) {
+      Alert.alert(
+        "Authentication Required",
+        "Please sign in to generate an itinerary.",
+        [
+          { text: "Sign In", onPress: () => router.push("/login") },
+          { text: "Cancel", style: "cancel" },
+        ]
+      );
+      return;
+    }
+
+    if (!toLocation?.geoCode) {
+      Alert.alert("Error", "Please select a destination");
+      return;
+    }
+    if (!dates.startDate || !dates.endDate) {
+      Alert.alert("Error", "Please select travel dates");
+      return;
+    }
+
     setIsGenerating(true);
-    const { setGeneratedPlaces, setGeneratedItinerary, setTripParameters } =
-      useItineraryStore.getState();
 
     try {
-      // 1. First fetch nearby places
-      const nearbyPlaces = await fetchNearbyPlaces();
-      setGeneratedPlaces(nearbyPlaces);
-
-      if (!nearbyPlaces || nearbyPlaces.length === 0) {
+      // 1. Fetch nearby places
+      const places = await fetchNearbyPlaces();
+      if (!places || places.length === 0) {
         Alert.alert("No places found", "Couldn't find any nearby attractions");
         return;
       }
+      setGeneratedPlaces(places);
 
       // 2. Prepare data for itinerary generation
       const itineraryData = {
         destination: toLocation?.name || "",
         coordinates: {
-          latitude: 19.07609,
-          longitude: 72.877426,
+          latitude: toLocation?.geoCode.latitude,
+          longitude: toLocation?.geoCode.longitude,
         },
         dates: {
           start: dates.startDate,
@@ -266,11 +251,7 @@ const ReviewSummaryScreen = ({ navigation }) => {
           budget: budgetPreference,
           tripType: tripType,
         },
-        nearbyPlaces: nearbyPlaces.map((place) => ({
-          name: place.displayName?.text || "Unknown Place",
-          types: place.types || [],
-          rating: place.rating || 0,
-        })),
+        places: places,
       };
 
       // Save trip parameters to store
@@ -287,20 +268,26 @@ const ReviewSummaryScreen = ({ navigation }) => {
 
       // 3. Generate the AI itinerary
       const itinerary = await generateAItinerary(itineraryData);
-      setGeneratedItinerary(itinerary);
+      const enrichedItinerary = enrichItinerary(itinerary, places);
+      setGeneratedItinerary(enrichedItinerary);
 
-      // 4. Save to database
-      // await saveItineraryToDB({
-      //   places: nearbyPlaces,
-      //   itinerary,
-      //   parameters: itineraryData,
-      // });
+      console.log(
+        "Generated itinerary:",
+        JSON.stringify(enrichedItinerary, null, 2)
+      );
 
-      // 5. Navigate to itinerary screen
+      // 4. Save to Firebase
+      await saveItineraryToDB({
+        places,
+        itinerary: enrichedItinerary,
+        parameters: itineraryData,
+      });
+
+      // 5. Navigate to trips screen
       router.replace({
-        pathname: "/itinerary",
+        pathname: "(tabs)/trips",
         params: {
-          newlyGenerated: "true", // Flag to indicate this is a new itinerary
+          newlyGenerated: "true",
         },
       });
     } catch (error) {
@@ -313,9 +300,9 @@ const ReviewSummaryScreen = ({ navigation }) => {
 
   const fetchNearbyPlaces = async () => {
     try {
-      // if (!toLocation?.geoCode) {
-      //   throw new Error("Destination location not set");
-      // }
+      if (!toLocation?.geoCode) {
+        throw new Error("Destination location not set");
+      }
 
       const response = await GetPlaceDetails({
         includedPrimaryTypes: [
@@ -333,16 +320,15 @@ const ReviewSummaryScreen = ({ navigation }) => {
         locationRestriction: {
           circle: {
             center: {
-              // latitude: toLocation.geoCode.latitude,
-              // longitude: toLocation.geoCode.longitude,
-              latitude: 19.07609,
-              longitude: 72.877426,
+              latitude: toLocation.geoCode.latitude,
+              longitude: toLocation.geoCode.longitude,
             },
             radius: 15000,
           },
         },
       });
 
+      console.log("Places Response:", response?.places);
       return response?.places || [];
     } catch (error) {
       console.error("Error fetching nearby places:", error);
@@ -372,42 +358,45 @@ const ReviewSummaryScreen = ({ navigation }) => {
   };
 
   const generateAItinerary = async (itineraryData) => {
+    const placesPerDay = Math.ceil(
+      itineraryData.places.length / itineraryData.dates.duration
+    );
     const prompt = `
-      Generate a detailed travel plan for ${itineraryData.destination} for 
-      ${itineraryData.dates.duration} Days and ${
+      You are a travel planner generating a detailed itinerary for a trip to ${
+        itineraryData.destination
+      } for 
+      ${itineraryData.dates.duration} days and ${
       itineraryData.dates.totalNights
-    } Nights 
+    } nights 
       for ${itineraryData.travelers.description} with a ${
       itineraryData.preferences.budget
     } budget.
-      
+
       Trip Type: ${itineraryData.preferences.tripType}
       Interests: ${itineraryData.preferences.interests.join(", ")}
-      
-      Please create a day-by-day itinerary using the following ${
-        itineraryData.nearbyPlaces.length
-      } places:
-      ${itineraryData.nearbyPlaces
-        .map((place) => `- ${place.name} (Rating: ${place.rating})`)
-        .join("\n")}
-      
+
+      Create a day-by-day itinerary using the following ${
+        itineraryData.places.length
+      } places (use all provided details):
+      ${JSON.stringify(itineraryData.places, null, 2)}
+
       Requirements:
-      1. Divide the places evenly across ${itineraryData.dates.duration} days
-      2. Each day should start around 10 AM and end by 8 PM
-      3. Group nearby locations together to minimize travel time
-      4. Include lunch breaks at appropriate times
-      5. Consider weather conditions (provide suitable indoor alternatives if rain is expected)
+      1. Distribute the ${itineraryData.places.length} places evenly across ${
+      itineraryData.dates.duration
+    } days, with approximately ${placesPerDay} places per day.
+      2. Each day should start around 10 AM and end by 8 PM.
+      3. Group nearby locations together based on their coordinates (latitude, longitude) to minimize travel time.
+      4. Include lunch breaks at appropriate times, selecting restaurants or cafes from the provided places if available.
+      5. Consider weather conditions (provide suitable indoor alternatives like museums or cafes if rain is expected).
       6. Ensure the itinerary matches the ${
         itineraryData.preferences.budget
-      } budget level
-      
-      Output Format (JSON):
+      } budget level (e.g., prioritize free or low-cost activities for Budget, high-end dining and exclusive experiences for Luxury).
+      7. Provide transportation tips specific to ${itineraryData.destination}.
+      8. Ensure the itinerary is realistic, enjoyable, and aligns with the user's interests.
+      9. Use the place names exactly as provided in the places array for matching purposes.
+
+      Output Format (strict JSON, do not deviate):
       {
-        "destination": "${itineraryData.destination}",
-        "duration": "${itineraryData.dates.duration} days",
-        "budget": "${itineraryData.preferences.budget}",
-        "travelers": ${JSON.stringify(itineraryData.travelers)},
-        "interests": ${JSON.stringify(itineraryData.preferences.interests)},
         "dailyItinerary": [
           {
             "day": 1,
@@ -418,61 +407,155 @@ const ReviewSummaryScreen = ({ navigation }) => {
                 "place": "Place Name",
                 "type": "Attraction/Activity",
                 "duration": "2 hours",
-                "description": "Brief description",
+                "description": "Brief description of the activity",
                 "travelTimeFromPrevious": "15 mins walk",
-                "notes": "Any special notes"
-              },
-              // More activities...
+                "notes": "Any special notes (e.g., ticket booking required)"
+              }
             ],
             "lunch": {
               "time": "1:00 PM",
               "place": "Restaurant Name",
               "type": "Lunch",
-              "duration": "1 hour"
+              "duration": "1 hour",
+              "description": "Brief description of the dining experience"
             }
-          },
-          // More days...
-        ],
-        "hotelRecommendations": [
-          {
-            "name": "Hotel Name",
-            "address": "Hotel Address",
-            "priceRange": "$100-$150/night",
-            "rating": 4.5,
-            "budgetMatch": "${itineraryData.preferences.budget}"
           }
-          // More hotels...
         ],
-        "transportationTips": "Include any transportation tips here",
+        "transportationTips": "Specific transportation tips for ${
+          itineraryData.destination
+        }",
         "additionalNotes": "Any additional notes or recommendations"
       }
-      
-      Please ensure the itinerary is realistic, enjoyable, and matches the user's preferences.
-      Include estimated travel times between locations and appropriate time allocations.
+
+      Ensure the response is valid JSON and strictly follows the specified structure. Use all ${
+        itineraryData.places.length
+      } places provided, and include their names in the dailyItinerary activities.
     `;
 
     try {
+      const chatSession = model.startChat({
+        generationConfig,
+        history: [],
+      });
       const result = await chatSession.sendMessage(prompt);
-      console.log("AI Response:", result.response.text());
-
-      // Parse the JSON response from the AI
       const responseText = result.response.text();
+
+      // Parse the JSON response
       const jsonStart = responseText.indexOf("{");
       const jsonEnd = responseText.lastIndexOf("}") + 1;
       const jsonString = responseText.slice(jsonStart, jsonEnd);
 
-      return JSON.parse(jsonString);
+      const parsedItinerary = JSON.parse(jsonString);
+      return parsedItinerary;
     } catch (error) {
       console.error("Error generating AI itinerary:", error);
       throw new Error("Failed to generate itinerary with AI");
     }
   };
 
+  const enrichItinerary = (itinerary, places) => {
+    const placeMap = new Map(
+      places.map((place) => [place.displayName?.text || place.name, place])
+    );
+
+    const enrichedDailyItinerary = itinerary.dailyItinerary.map((day) => {
+      const enrichedActivities = day.activities.map((activity) => {
+        const fullPlace = placeMap.get(activity.place);
+        if (fullPlace) {
+          return {
+            ...activity,
+            rating: fullPlace.rating || null,
+            userRatingCount: fullPlace.userRatingCount || null,
+            photos: fullPlace.photos || [],
+            location: fullPlace.location || {},
+          };
+        }
+        return activity;
+      });
+
+      let enrichedLunch = null;
+      if (day.lunch) {
+        const fullLunchPlace = placeMap.get(day.lunch.place);
+        enrichedLunch = fullLunchPlace
+          ? {
+              ...day.lunch,
+              rating: fullLunchPlace.rating || null,
+              userRatingCount: fullLunchPlace.userRatingCount || null,
+              photos: fullLunchPlace.photos || [],
+              location: fullLunchPlace.location || {},
+            }
+          : day.lunch;
+      }
+
+      return {
+        ...day,
+        activities: enrichedActivities,
+        lunch: enrichedLunch,
+      };
+    });
+
+    return {
+      ...itinerary,
+      dailyItinerary: enrichedDailyItinerary,
+    };
+  };
+
+  const saveItineraryToDB = async ({ places, itinerary, parameters }) => {
+    try {
+      if (!user) {
+        throw new Error("User not authenticated");
+      }
+
+      const docRef = await addDoc(collection(db, "itineraries"), {
+        clerkUserId: user.id,
+        userEmail: user.primaryEmailAddress?.emailAddress || "unknown",
+        places, // Array of all places with full details
+        itinerary: {
+          dailyItinerary: itinerary.dailyItinerary,
+          transportationTips: itinerary.transportationTips,
+          additionalNotes: itinerary.additionalNotes,
+        },
+        parameters: {
+          destination: parameters.destination,
+          coordinates: parameters.coordinates,
+          dates: parameters.dates,
+          travelers: parameters.travelers,
+          preferences: parameters.preferences,
+        },
+        createdAt: serverTimestamp(),
+      });
+      console.log("Itinerary saved to Firestore with ID:", docRef.id);
+    } catch (error) {
+      console.error("Error saving itinerary to Firestore:", error);
+      throw new Error("Failed to save itinerary to database");
+    }
+  };
+
+  const updateTravelerCount = (type, increment) => {
+    const newCount = increment ? travelers[type] + 1 : travelers[type] - 1;
+    if (newCount < 0) return;
+    if (type === "adults" && newCount === 0) return;
+    if (type === "infants" && newCount > travelers.adults) return;
+
+    const updatedTravelers = {
+      ...travelers,
+      [type]: newCount,
+    };
+    setTravelersToStore(updatedTravelers);
+  };
+
+  const handleDateConfirm = (selectedDates) => {
+    setDatesToStore({
+      startDate: selectedDates.startDate,
+      endDate: selectedDates.endDate,
+    });
+    setIsDatePickerVisible(false);
+  };
+
   const getTotalTravelers = () => {
     return travelers.adults + travelers.children + travelers.infants;
   };
 
-  // Map interest buttons to emojis
   const interestEmojis = {
     "Adventure Travel": "🏞️",
     "Beach Vacations": "🏖️",
@@ -481,7 +564,6 @@ const ReviewSummaryScreen = ({ navigation }) => {
     "Art Galleries": "🖼️",
   };
 
-  // Map budget preferences to emojis
   const budgetEmojis = {
     Budget: "💲",
     Moderate: "💲💲",
@@ -492,7 +574,6 @@ const ReviewSummaryScreen = ({ navigation }) => {
     return (
       <View style={styles.loadingContainer}>
         <SkeletonLoading />
-        {/* <ActivityIndicator size="large" /> */}
         <Text style={styles.loadingText}>
           Finding the best places in {toLocation?.name}...
         </Text>
@@ -528,14 +609,16 @@ const ReviewSummaryScreen = ({ navigation }) => {
               <View style={styles.destinationDetails}>
                 <Text style={styles.destinationName}>{toLocation.name}</Text>
                 <View style={styles.countryContainer}>
-                  <Text style={styles.countryName}>{tripType}</Text>
+                  <Text style={styles.countryName}>
+                    {toLocation.country || tripType}
+                  </Text>
                 </View>
               </View>
             </View>
           )}
         </View>
 
-        {/* Party Section - Now with inline editing */}
+        {/* Party Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionIconLabelContainer}>
@@ -564,13 +647,12 @@ const ReviewSummaryScreen = ({ navigation }) => {
                   setTravelersToStore(updated);
                   setIsTravelersDropdownOpen(false);
                 }}
-                onClose={() => setIsTravelersDropdownOpen(false)}
               />
             </View>
           )}
         </View>
 
-        {/* Trip Dates Section - Now with inline editing */}
+        {/* Trip Dates Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionIconLabelContainer}>
@@ -646,12 +728,11 @@ const ReviewSummaryScreen = ({ navigation }) => {
         </View>
       </ScrollView>
 
-      {/* Date Picker Modal */}
       <DatePickerModal
         visible={isDatePickerVisible}
         onClose={() => setIsDatePickerVisible(false)}
         onSelectDates={handleDateConfirm}
-        activeTab="Places" // Or whatever makes sense for your review page
+        activeTab="Places"
         tripType={tripType}
         initialDates={dates}
       />
@@ -774,18 +855,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#333",
   },
-  buildButton: {
-    backgroundColor: "#333",
-    borderRadius: 8,
-    margin: 20,
-    paddingVertical: 15,
-    alignItems: "center",
-  },
-  buildButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
   travelersDropdown: {
     marginTop: 8,
     position: "relative",
@@ -822,13 +891,10 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    // backgroundColor: 'white',
     justifyContent: "center",
     alignItems: "center",
   },
-  buttonDisabled: {
-    // backgroundColor: '#f1f1f1',
-  },
+  buttonDisabled: {},
   counterButtonText: {
     color: "black",
     fontSize: 20,

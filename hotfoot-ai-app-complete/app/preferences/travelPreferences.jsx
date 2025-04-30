@@ -15,14 +15,14 @@ import useTravelPreferencesStore from "../store/travelPreferencesZustandStore";
 const TravelPreferences = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const { userId, getToken } = useAuth();
+  const { userId } = useAuth();
   const { updatePreferences, userData, fetchUserData } = useUserStore();
   const { selectedButtons, setSelectedButtons } = useTravelPreferencesStore();
 
   useEffect(() => {
     const loadUserData = async () => {
       if (userId) {
-        await fetchUserData(userId, getToken);
+        await fetchUserData(userId);
       }
     };
     loadUserData();
@@ -30,17 +30,22 @@ const TravelPreferences = () => {
 
   useEffect(() => {
     if (userData?.preferences?.activities) {
-      const storedSelections = userData.preferences.activities.map(
-        (activity) => {
-          return activity.toLowerCase();
-        }
+      const storedSelections = userData.preferences.activities.map((activity) =>
+        activity.toLowerCase()
       );
       setSelectedButtons(storedSelections);
     }
   }, [userData]);
 
-  const handleButtonSelected = (selectedValues) => {
+  const handleButtonSelected = async (selectedValues) => {
     setSelectedButtons(selectedValues);
+    try {
+      await updatePreferences(userId, {
+        activities: selectedValues.map((activity) => activity.toLowerCase()),
+      });
+    } catch (error) {
+      console.error("Error saving partial preferences:", error);
+    }
   };
 
   const handleDone = async () => {
@@ -54,7 +59,7 @@ const TravelPreferences = () => {
         return;
       }
 
-      const result = await updatePreferences(userId, getToken, {
+      const result = await updatePreferences(userId, {
         activities: selectedButtons.map((activity) => activity.toLowerCase()),
       });
 
