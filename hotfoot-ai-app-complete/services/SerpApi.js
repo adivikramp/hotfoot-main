@@ -103,6 +103,7 @@ export const getJourneyDetails = async (params) => {
 };
 
 export const formatFlightSearchParams = (searchData) => {
+  console.log("CONSOLE LOG FROM formatFlightSearchParams: ", searchData);
   const parseDateString = (dateStr) => {
     if (!dateStr) return null;
 
@@ -135,13 +136,13 @@ export const formatFlightSearchParams = (searchData) => {
     return `${year}-${month}-${day}`;
   };
 
-  if (!searchData.fromLocation?.code || !searchData.toLocation?.code) {
+  if (!searchData.fromLocation || !searchData.toLocation) {
     throw new Error("Please select valid departure and arrival locations");
   }
 
   const params = {
-    departureId: searchData.fromLocation.code,
-    arrivalId: searchData.toLocation.code,
+    departureId: searchData.fromLocation,
+    arrivalId: searchData.toLocation,
     outboundDate: parseDateString(searchData.dates.startDate),
     adults: searchData.travelers.adults || 1,
     children: searchData.travelers.children || 0,
@@ -189,7 +190,7 @@ export const getHotel = async (params) => {
 };
 
 export const formatHotelSearchParams = (searchData) => {
-  console.log(searchData);
+  console.log("searchData from serpAPI: ", searchData);
   const parseDateString = (dateStr) => {
     if (!dateStr) return null;
 
@@ -222,12 +223,12 @@ export const formatHotelSearchParams = (searchData) => {
     return `${year}-${month}-${day}`;
   };
 
-  if (!searchData.toLocation?.name) {
+  if (!searchData.toLocation) {
     throw new Error("Please select valid destination location");
   }
 
   const params = {
-    q: searchData.toLocation.name.toLowerCase(),
+    q: searchData.toLocation.toLowerCase(),
     outboundDate: parseDateString(searchData.dates.startDate),
     returnDate: parseDateString(searchData.dates.endDate),
     adults: searchData.travelers.adults || 1,

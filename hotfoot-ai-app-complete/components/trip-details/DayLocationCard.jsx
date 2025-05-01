@@ -114,7 +114,11 @@ const DayLocationCard = ({ place, isLast }) => {
               {place.description && (
                 <View className="flex-row items-center mb-2">
                   <MaterialIcons name="info" size={16} color="#555" />
-                  <Text className="ml-2 text-lg text-gray-800" numberOfLines={1} ellipsizeMode="tail">
+                  <Text
+                    className="ml-2 text-lg text-gray-800"
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                  >
                     {place.description}
                   </Text>
                 </View>
@@ -122,7 +126,11 @@ const DayLocationCard = ({ place, isLast }) => {
               {place.notes && (
                 <View className="flex-row items-center mb-2">
                   <MaterialIcons name="note" size={16} color="#555" />
-                  <Text className="ml-2 text-lg text-gray-800" numberOfLines={1} ellipsizeMode="tail">
+                  <Text
+                    className="ml-2 text-lg text-gray-800"
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                  >
                     {place.notes}
                   </Text>
                 </View>

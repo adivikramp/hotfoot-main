@@ -7,14 +7,9 @@ import {
 } from "react-native";
 import React from "react";
 import { useRouter } from "expo-router";
-import {
-  ChevronRight,
-  Settings as SettingsIcon,
-  User,
-  Map,
-  LogOut,
-} from "lucide-react-native";
+import { ChevronRight, User, Map, LogOut } from "lucide-react-native";
 import { useAuth } from "@clerk/clerk-expo";
+import TopBar from "../../components/topBar";
 
 const Settings = () => {
   const router = useRouter();
@@ -42,7 +37,7 @@ const Settings = () => {
     try {
       console.log("Logging out...");
       await signOut();
-      router.replace("/auth/index");
+      router.replace("/auth");
       console.log("User logged out successfully");
     } catch (err) {
       console.error("Failed to log out:", err);
@@ -52,12 +47,8 @@ const Settings = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <SettingsIcon size={24} color="#000" />
-        <Text style={styles.headerTitle}>Settings</Text>
-      </View>
-
-      <View style={styles.section}>
+      <TopBar logo text={"Settings"} />
+      <View>
         <TouchableOpacity
           style={styles.menuItem}
           onPress={handleTravelPreferences}
@@ -83,8 +74,12 @@ const Settings = () => {
       </View>
 
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <LogOut size={20} color="#FF4444" />
-        <Text style={styles.logoutText}>Logout</Text>
+        <View style={styles.menuItemLeft}>
+          <View style={styles.logoutIconContainer}>
+            <LogOut size={22} color="#FF4444" />
+          </View>
+          <Text style={styles.logoutText}>Logout</Text>
+        </View>
       </TouchableOpacity>
     </SafeAreaView>
   );
@@ -106,9 +101,6 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "600",
     marginLeft: 12,
-  },
-  section: {
-    marginTop: 20,
   },
   menuItem: {
     flexDirection: "row",
@@ -143,12 +135,20 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 16,
     marginTop: "auto",
-    marginBottom: 32,
+  },
+  logoutIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#FFF",
+    justifyContent: "center",
+    alignItems: "center",
   },
   logoutText: {
-    fontSize: 16,
+    fontSize: 18,
     color: "#FF4444",
-    marginLeft: 12,
+    fontWeight: "500",
+    marginLeft: 6,
   },
 });
 

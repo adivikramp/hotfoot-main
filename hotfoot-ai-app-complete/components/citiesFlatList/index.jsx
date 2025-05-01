@@ -232,13 +232,14 @@ export const TopPicksCityList = ({ data }) => {
       startDate: selectedDates.startDate,
       endDate: selectedDates.endDate,
     });
+
     const searchDataHotels = {
       dates: {
         startDate: selectedDates.startDate,
         endDate: selectedDates.endDate,
         totalDays: selectedDates.totalDays,
       },
-      toLocation,
+      toLocation: toLocation.name,
       travelers,
     };
 

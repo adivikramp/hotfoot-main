@@ -188,20 +188,6 @@ export default function ExploreScreen() {
           <Text style={styles.priceText}>${flight.price}</Text>
           <Text style={styles.priceSubtext}>{flight.type}</Text>
         </View>
-        <TouchableOpacity
-          style={styles.viewMoreButton}
-          onPress={() =>
-            router.push({
-              pathname: "/flightDetails",
-              params: {
-                flightResults: JSON.stringify(flightData),
-                searchData: JSON.stringify(flightSearchParams),
-              },
-            })
-          }
-        >
-          <Text style={styles.viewMoreText}>View all flights</Text>
-        </TouchableOpacity>
       </MotiView>
     );
   };
@@ -292,6 +278,20 @@ export default function ExploreScreen() {
                 No flights found for your dates
               </Text>
             )}
+            <TouchableOpacity
+              style={styles.viewMoreButton}
+              onPress={() =>
+                router.push({
+                  pathname: "/flightDetails",
+                  params: {
+                    flightResults: JSON.stringify(flightData),
+                    searchData: JSON.stringify(flightSearchParams),
+                  },
+                })
+              }
+            >
+              <Text style={styles.viewMoreText}>View all flights</Text>
+            </TouchableOpacity>
           </MotiView>
 
           {/* Stays Section */}

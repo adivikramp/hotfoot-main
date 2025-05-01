@@ -8,6 +8,24 @@ const useItineraryStore = create((set) => ({
     // Generated itinerary from Gemini AI
     generatedItinerary: null,
     setGeneratedItinerary: (itinerary: any) => set({ generatedItinerary: itinerary }),
+    updateDailyPlan: (dayKey: any, newPlaces: any) =>
+        set((state: any) => {
+            if (state.generatedItinerary && state.generatedItinerary.dailyPlan) {
+                return {
+                    generatedItinerary: {
+                        ...state.generatedItinerary,
+                        dailyPlan: {
+                            ...state.generatedItinerary.dailyPlan,
+                            [dayKey]: {
+                                ...state.generatedItinerary.dailyPlan[dayKey],
+                                places: newPlaces,
+                            },
+                        },
+                    },
+                };
+            }
+            return state;
+        }),
 
     // Trip search parameters
     tripParameters: null,
@@ -17,7 +35,7 @@ const useItineraryStore = create((set) => ({
     resetItinerary: () => set({
         generatedPlaces: [],
         generatedItinerary: null,
-        tripParameters: null
+        tripParameters: null,
     }),
 }));
 

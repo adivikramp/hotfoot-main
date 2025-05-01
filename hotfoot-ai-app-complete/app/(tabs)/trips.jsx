@@ -31,10 +31,6 @@ const Trips = () => {
 
     try {
       console.log("Fetching trips for user:", user.id);
-      console.log(
-        "Google Maps API Key:",
-        process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
-      );
       const tripsQuery = query(
         collection(db, "itineraries"),
         where("clerkUserId", "==", user.id)
@@ -43,7 +39,6 @@ const Trips = () => {
 
       const trips = querySnapshot.docs.map((doc) => {
         const data = doc.data();
-        // Calculate total number of days
         const startDate = parse(
           data.parameters.dates.start,
           "MMM d, yyyy",
@@ -59,11 +54,9 @@ const Trips = () => {
             ? 0
             : Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
 
-        // Map Firestore itinerary to dailyPlan format
         const dailyPlan = data.itinerary.dailyItinerary.reduce((acc, day) => {
           acc[`day${day.day}`] = {
             places: day.activities.map((activity) => {
-              // Find matching place in places array for additional details
               const matchingPlace = data.places.find(
                 (place) =>
                   place.displayName?.text === activity.place ||
@@ -81,7 +74,6 @@ const Trips = () => {
                 image: matchingPlace?.photos?.[0]?.name
                   ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${matchingPlace.photos[0].name}&key=${process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}`
                   : "https://via.placeholder.com/400",
-                // Add transportTimes if available in Firestore
                 transportTimes: matchingPlace?.transportTimes || null,
               };
             }),
@@ -158,7 +150,6 @@ const Trips = () => {
         };
       });
 
-      console.log("Fetched trips:", JSON.stringify(trips, null, 2));
       setUserTrips(trips);
     } catch (err) {
       console.error("Error fetching user trips from Firestore:", err);
@@ -210,7 +201,7 @@ const Trips = () => {
 
   return (
     <SafeAreaView className="flex-1 bg-white">
-      <TopBar logo text={"My Trips"} rightIcons={"search"} />
+      <TopBar logo text={"My Trips"} />
       <ScrollView
         className="flex-1 bg-white mx-6"
         showsVerticalScrollIndicator={false}
@@ -277,7 +268,10 @@ const Trips = () => {
                     </View>
                     <View className="flex-row justify-between items-center mt-2">
                       <Text className="text-lg font-semibold">
-                        {trip.tripData.city.name}, {trip.tripData.city.country}
+                        {trip.tripData.city.name}
+                        {trip.tripData.city.country
+                          ? `, ${trip.tripData.city.country}`
+                          : ""}
                       </Text>
                       <View className="items-center justify-center my-2">
                         <EllipsisVertical size={24} color="#000" />

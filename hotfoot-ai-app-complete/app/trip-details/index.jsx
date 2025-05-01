@@ -1,14 +1,7 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
-import {
-  Text,
-  View,
-  ScrollView,
-  ActivityIndicator,
-  Image,
-  TouchableOpacity,
-} from "react-native";
+import { Text, View, ScrollView, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { format, parse, addDays, isWithinInterval, isDate } from "date-fns";
 import TripHeader from "../../components/trip-details/TripHeader";
@@ -17,6 +10,8 @@ import { PencilLine } from "lucide-react-native";
 import MapView, { Marker } from "react-native-maps";
 import { db } from "../../config/firebaseConfig";
 import { doc, getDoc } from "firebase/firestore";
+import useItineraryStore from "../../app/store/itineraryZustandStore";
+import SkeletonLoading from "../../components/skeletonLoading/skeletonLoading";
 
 const formatDate = (date) => {
   if (!isDate(date)) return "";
@@ -53,13 +48,13 @@ const TripDetails = () => {
   const [loading, setLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState(null);
 
+  const { generatedItinerary, setGeneratedItinerary } = useItineraryStore();
+
   useEffect(() => {
     const fetchTripData = async () => {
       setLoading(true);
       try {
-        // Parse the passed tripData
         const parsedTrip = JSON.parse(tripDataParam);
-        console.log("Parsed trip data:", JSON.stringify(parsedTrip, null, 2));
 
         const tripId = parsedTrip.id;
         const tripDocRef = doc(db, "itineraries", tripId);
@@ -72,21 +67,26 @@ const TripDetails = () => {
             JSON.stringify(tripDataFromDB)
           );
 
-          setFullTripData(tripDataFromDB);
-          setTrip({
+          const updatedTrip = {
             ...parsedTrip,
             parameters: tripDataFromDB.parameters,
-          });
+            dailyPlan: tripDataFromDB.dailyPlan || parsedTrip.dailyPlan,
+          };
+
+          setFullTripData(tripDataFromDB);
+          setTrip(updatedTrip);
+          setGeneratedItinerary(updatedTrip);
 
           if (
-            parsedTrip.dailyPlan &&
-            Object.keys(parsedTrip.dailyPlan).length > 0
+            updatedTrip.dailyPlan &&
+            Object.keys(updatedTrip.dailyPlan).length > 0
           ) {
-            setSelectedDay(Object.keys(parsedTrip.dailyPlan)[0]);
+            setSelectedDay(Object.keys(updatedTrip.dailyPlan)[0]);
           }
         } else {
           console.error("Trip not found in Firestore");
           setTrip(parsedTrip);
+          setGeneratedItinerary(parsedTrip);
           if (
             parsedTrip.dailyPlan &&
             Object.keys(parsedTrip.dailyPlan).length > 0
@@ -98,6 +98,7 @@ const TripDetails = () => {
         console.error("Error fetching trip data from Firestore:", error);
         const parsedTrip = JSON.parse(tripDataParam);
         setTrip(parsedTrip);
+        setGeneratedItinerary(parsedTrip);
         if (
           parsedTrip.dailyPlan &&
           Object.keys(parsedTrip.dailyPlan).length > 0
@@ -112,13 +113,26 @@ const TripDetails = () => {
     if (tripDataParam) {
       fetchTripData();
     }
-  }, [tripDataParam]);
+  }, [tripDataParam, setGeneratedItinerary]);
+
+  useEffect(() => {
+    if (generatedItinerary) {
+      setTrip(generatedItinerary);
+      if (
+        generatedItinerary.dailyPlan &&
+        Object.keys(generatedItinerary.dailyPlan).length > 0 &&
+        !selectedDay
+      ) {
+        setSelectedDay(Object.keys(generatedItinerary.dailyPlan)[0]);
+      }
+    }
+  }, [generatedItinerary, selectedDay]);
 
   if (loading) {
     return (
       <SafeAreaView className="w-full flex-1 bg-white">
         <View className="m-4">
-          <ActivityIndicator size="large" color="#0000ff" />
+          <SkeletonLoading />
         </View>
       </SafeAreaView>
     );
@@ -203,10 +217,6 @@ const TripDetails = () => {
     }
 
     return dayPlan.places.map((place, index) => {
-      console.log(
-        `Rendering DayLocationCard for place:`,
-        JSON.stringify(place)
-      );
       return (
         <DayLocationCard
           key={`${selectedDay}-${index}`}
@@ -238,8 +248,10 @@ const TripDetails = () => {
         {/* Trip Overview */}
         <View className="px-6 pt-4">
           <Text className="text-2xl font-bold">
-            {trip.tripData.city.name || "Unknown City"},{" "}
-            {trip.tripData.city.country || "Unknown Country"}
+            {trip.tripData.city.name || "Unknown City"}
+            {trip.tripData.city.country
+              ? `, ${trip.tripData.city.country}`
+              : ""}
           </Text>
           <Text className="text-gray-500 mt-1">
             {trip.tripData.startDate} - {trip.tripData.endDate} •{" "}

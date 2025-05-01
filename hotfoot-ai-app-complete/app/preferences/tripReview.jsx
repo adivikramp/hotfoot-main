@@ -6,8 +6,6 @@ import {
   TouchableOpacity,
   ScrollView,
   SafeAreaView,
-  Pressable,
-  ActivityIndicator,
   Alert,
 } from "react-native";
 import { AntDesign, Ionicons } from "@expo/vector-icons";
@@ -18,161 +16,10 @@ import TopBar from "../../components/topBar";
 import BottomBarContinueBtn from "../../components/buttons/bottomBarContinueBtn";
 import { useRouter } from "expo-router";
 import DatePickerModal from "../../components/datePickerModal/datePickerModal";
-import { GetPlaceDetails } from "../../services/GlobalApi";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import SkeletonLoading from "../../components/skeletonLoading/skeletonLoading";
-import { db } from "../../config/firebaseConfig";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { useUser } from "@clerk/clerk-expo";
-
-const apiKey = process.env.EXPO_PUBLIC_GOOGLE_GEMINI_API_KEY;
-const genAI = new GoogleGenerativeAI(apiKey);
-
-const model = genAI.getGenerativeModel({
-  model: "gemini-1.5-flash",
-});
-
-const generationConfig = {
-  temperature: 1,
-  topP: 0.95,
-  topK: 40,
-  maxOutputTokens: 8192,
-  responseMimeType: "application/json",
-};
-
-const TravelersDropdown = ({ travelers, setTravelers }) => {
-  const updateTravelerCount = (type, increment) => {
-    const newCount = increment ? travelers[type] + 1 : travelers[type] - 1;
-    if (newCount < 0) return;
-    if (type === "adults" && newCount === 0) return;
-    if (type === "infants" && newCount > travelers.adults) return;
-
-    setTravelers({
-      ...travelers,
-      [type]: newCount,
-    });
-  };
-
-  return (
-    <View style={styles.travelersDropdown}>
-      <View style={styles.travelerContent}>
-        <View style={styles.travelerType}>
-          <View>
-            <Text style={styles.travelerTitle}>Adults</Text>
-            <Text style={styles.travelerSubtitle}>Age 13+</Text>
-          </View>
-          <View style={styles.counter}>
-            <Pressable
-              style={[
-                styles.counterButton,
-                travelers.adults <= 1 && styles.buttonDisabled,
-              ]}
-              onPress={() => updateTravelerCount("adults", false)}
-              disabled={travelers.adults <= 1}
-            >
-              <Text
-                style={
-                  travelers.adults <= 1
-                    ? styles.counterButtonTextDisabled
-                    : styles.counterButtonText
-                }
-              >
-                -
-              </Text>
-            </Pressable>
-            <Text style={styles.count}>{travelers.adults}</Text>
-            <Pressable
-              style={styles.counterButton}
-              onPress={() => updateTravelerCount("adults", true)}
-            >
-              <Text style={styles.counterButtonText}>+</Text>
-            </Pressable>
-          </View>
-        </View>
-
-        <View style={styles.travelerType}>
-          <View>
-            <Text style={styles.travelerTitle}>Children</Text>
-            <Text style={styles.travelerSubtitle}>Age 2-12</Text>
-          </View>
-          <View style={styles.counter}>
-            <Pressable
-              style={[
-                styles.counterButton,
-                travelers.children === 0 && styles.buttonDisabled,
-              ]}
-              onPress={() => updateTravelerCount("children", false)}
-              disabled={travelers.children === 0}
-            >
-              <Text
-                style={
-                  travelers.children === 0
-                    ? styles.counterButtonTextDisabled
-                    : styles.counterButtonText
-                }
-              >
-                -
-              </Text>
-            </Pressable>
-            <Text style={styles.count}>{travelers.children}</Text>
-            <Pressable
-              style={styles.counterButton}
-              onPress={() => updateTravelerCount("children", true)}
-            >
-              <Text style={styles.counterButtonText}>+</Text>
-            </Pressable>
-          </View>
-        </View>
-
-        <View style={styles.travelerType}>
-          <View>
-            <Text style={styles.travelerTitle}>Infants</Text>
-            <Text style={styles.travelerSubtitle}>Under 2</Text>
-          </View>
-          <View style={styles.counter}>
-            <Pressable
-              style={[
-                styles.counterButton,
-                travelers.infants === 0 && styles.buttonDisabled,
-              ]}
-              onPress={() => updateTravelerCount("infants", false)}
-              disabled={travelers.infants === 0}
-            >
-              <Text
-                style={
-                  travelers.infants === 0
-                    ? styles.counterButtonTextDisabled
-                    : styles.counterButtonText
-                }
-              >
-                -
-              </Text>
-            </Pressable>
-            <Text style={styles.count}>{travelers.infants}</Text>
-            <Pressable
-              style={[
-                styles.counterButton,
-                travelers.infants >= travelers.adults && styles.buttonDisabled,
-              ]}
-              onPress={() => updateTravelerCount("infants", true)}
-              disabled={travelers.infants >= travelers.adults}
-            >
-              <Text
-                style={
-                  travelers.infants >= travelers.adults
-                    ? styles.counterButtonTextDisabled
-                    : styles.counterButtonText
-                }
-              >
-                +
-              </Text>
-            </Pressable>
-          </View>
-        </View>
-      </View>
-    </View>
-  );
-};
+import TravelersDropdown from "../../components/travelersDropdown";
+import { generateItinerary } from "../../services/ItineraryApi";
 
 const ReviewSummaryScreen = () => {
   const router = useRouter();
@@ -182,7 +29,6 @@ const ReviewSummaryScreen = () => {
   const [isTravelersDropdownOpen, setIsTravelersDropdownOpen] = useState(false);
 
   const {
-    fromLocation,
     toLocation,
     dates,
     travelers,
@@ -193,6 +39,22 @@ const ReviewSummaryScreen = () => {
   const { selectedButtons, budgetPreference } = useTravelPreferencesStore();
   const { setGeneratedPlaces, setGeneratedItinerary, setTripParameters } =
     useItineraryStore();
+
+  useEffect(() => {
+    if (
+      !(
+        (toLocation?.geoCode?.latitude && toLocation?.geoCode?.longitude) ||
+        (toLocation?.coordinates?.latitude &&
+          toLocation?.coordinates?.longitude)
+      )
+    ) {
+      console.warn("Invalid toLocation on mount:", toLocation);
+      Alert.alert(
+        "Error",
+        "Destination data is incomplete. Please select a destination."
+      );
+    }
+  }, [toLocation]);
 
   const generateTrip = async () => {
     if (!user) {
@@ -207,7 +69,13 @@ const ReviewSummaryScreen = () => {
       return;
     }
 
-    if (!toLocation?.geoCode) {
+    if (
+      !(
+        (toLocation?.geoCode?.latitude && toLocation?.geoCode?.longitude) ||
+        (toLocation?.coordinates?.latitude &&
+          toLocation?.coordinates?.longitude)
+      )
+    ) {
       Alert.alert("Error", "Please select a destination");
       return;
     }
@@ -219,71 +87,35 @@ const ReviewSummaryScreen = () => {
     setIsGenerating(true);
 
     try {
-      // 1. Fetch nearby places
-      const places = await fetchNearbyPlaces();
-      if (!places || places.length === 0) {
-        Alert.alert("No places found", "Couldn't find any nearby attractions");
-        return;
-      }
-      setGeneratedPlaces(places);
-
-      // 2. Prepare data for itinerary generation
-      const itineraryData = {
+      const tripData = {
         destination: toLocation?.name || "",
-        coordinates: {
-          latitude: toLocation?.geoCode.latitude,
-          longitude: toLocation?.geoCode.longitude,
-        },
+        geoCode: toLocation?.geoCode || {},
+        coordinates: toLocation?.coordinates || {},
         dates: {
-          start: dates.startDate,
-          end: dates.endDate,
-          duration: dates.totalDays,
-          totalNights: dates.totalDays - 1,
+          startDate: dates.startDate,
+          endDate: dates.endDate,
+          totalDays: dates.totalDays,
         },
         travelers: {
           adults: travelers.adults,
           children: travelers.children,
           infants: travelers.infants,
-          description: getTravelerDescription(travelers),
         },
         preferences: {
           interests: selectedButtons,
           budget: budgetPreference,
           tripType: tripType,
         },
-        places: places,
       };
 
-      // Save trip parameters to store
-      setTripParameters({
-        destination: toLocation?.name,
-        dates,
-        travelers,
-        preferences: {
-          interests: selectedButtons,
-          budget: budgetPreference,
-          tripType,
-        },
-      });
-
-      // 3. Generate the AI itinerary
-      const itinerary = await generateAItinerary(itineraryData);
-      const enrichedItinerary = enrichItinerary(itinerary, places);
-      setGeneratedItinerary(enrichedItinerary);
-
-      console.log(
-        "Generated itinerary:",
-        JSON.stringify(enrichedItinerary, null, 2)
+      await generateItinerary(
+        tripData,
+        user,
+        setGeneratedPlaces,
+        setGeneratedItinerary,
+        setTripParameters
       );
 
-      // 4. Save to Firebase
-      await saveItineraryToDB({
-        places,
-        itinerary: enrichedItinerary,
-        parameters: itineraryData,
-      });
-
-      // 5. Navigate to trips screen
       router.replace({
         pathname: "(tabs)/trips",
         params: {
@@ -292,256 +124,13 @@ const ReviewSummaryScreen = () => {
       });
     } catch (error) {
       console.error("Error generating itinerary:", error);
-      Alert.alert("Error", "Failed to generate itinerary. Please try again.");
+      Alert.alert(
+        "Error",
+        error.message || "Failed to generate itinerary. Please try again."
+      );
     } finally {
       setIsGenerating(false);
     }
-  };
-
-  const fetchNearbyPlaces = async () => {
-    try {
-      if (!toLocation?.geoCode) {
-        throw new Error("Destination location not set");
-      }
-
-      const response = await GetPlaceDetails({
-        includedPrimaryTypes: [
-          "tourist_attraction",
-          "museum",
-          "park",
-          "restaurant",
-          "shopping_mall",
-          "amusement_park",
-          "aquarium",
-          "art_gallery",
-          "cafe",
-        ],
-        maxResultCount: 20,
-        locationRestriction: {
-          circle: {
-            center: {
-              latitude: toLocation.geoCode.latitude,
-              longitude: toLocation.geoCode.longitude,
-            },
-            radius: 15000,
-          },
-        },
-      });
-
-      console.log("Places Response:", response?.places);
-      return response?.places || [];
-    } catch (error) {
-      console.error("Error fetching nearby places:", error);
-      Alert.alert("Error", "Failed to fetch nearby places. Please try again.");
-      return [];
-    }
-  };
-
-  const getTravelerDescription = (travelers) => {
-    const total = travelers.adults + travelers.children + travelers.infants;
-    if (total === 1) return "Only Me";
-
-    let description = `${travelers.adults} Adult${
-      travelers.adults > 1 ? "s" : ""
-    }`;
-    if (travelers.children > 0) {
-      description += `, ${travelers.children} Child${
-        travelers.children > 1 ? "ren" : ""
-      }`;
-    }
-    if (travelers.infants > 0) {
-      description += `, ${travelers.infants} Infant${
-        travelers.infants > 1 ? "s" : ""
-      }`;
-    }
-    return description;
-  };
-
-  const generateAItinerary = async (itineraryData) => {
-    const placesPerDay = Math.ceil(
-      itineraryData.places.length / itineraryData.dates.duration
-    );
-    const prompt = `
-      You are a travel planner generating a detailed itinerary for a trip to ${
-        itineraryData.destination
-      } for 
-      ${itineraryData.dates.duration} days and ${
-      itineraryData.dates.totalNights
-    } nights 
-      for ${itineraryData.travelers.description} with a ${
-      itineraryData.preferences.budget
-    } budget.
-
-      Trip Type: ${itineraryData.preferences.tripType}
-      Interests: ${itineraryData.preferences.interests.join(", ")}
-
-      Create a day-by-day itinerary using the following ${
-        itineraryData.places.length
-      } places (use all provided details):
-      ${JSON.stringify(itineraryData.places, null, 2)}
-
-      Requirements:
-      1. Distribute the ${itineraryData.places.length} places evenly across ${
-      itineraryData.dates.duration
-    } days, with approximately ${placesPerDay} places per day.
-      2. Each day should start around 10 AM and end by 8 PM.
-      3. Group nearby locations together based on their coordinates (latitude, longitude) to minimize travel time.
-      4. Include lunch breaks at appropriate times, selecting restaurants or cafes from the provided places if available.
-      5. Consider weather conditions (provide suitable indoor alternatives like museums or cafes if rain is expected).
-      6. Ensure the itinerary matches the ${
-        itineraryData.preferences.budget
-      } budget level (e.g., prioritize free or low-cost activities for Budget, high-end dining and exclusive experiences for Luxury).
-      7. Provide transportation tips specific to ${itineraryData.destination}.
-      8. Ensure the itinerary is realistic, enjoyable, and aligns with the user's interests.
-      9. Use the place names exactly as provided in the places array for matching purposes.
-
-      Output Format (strict JSON, do not deviate):
-      {
-        "dailyItinerary": [
-          {
-            "day": 1,
-            "date": "${itineraryData.dates.start}",
-            "activities": [
-              {
-                "time": "10:00 AM",
-                "place": "Place Name",
-                "type": "Attraction/Activity",
-                "duration": "2 hours",
-                "description": "Brief description of the activity",
-                "travelTimeFromPrevious": "15 mins walk",
-                "notes": "Any special notes (e.g., ticket booking required)"
-              }
-            ],
-            "lunch": {
-              "time": "1:00 PM",
-              "place": "Restaurant Name",
-              "type": "Lunch",
-              "duration": "1 hour",
-              "description": "Brief description of the dining experience"
-            }
-          }
-        ],
-        "transportationTips": "Specific transportation tips for ${
-          itineraryData.destination
-        }",
-        "additionalNotes": "Any additional notes or recommendations"
-      }
-
-      Ensure the response is valid JSON and strictly follows the specified structure. Use all ${
-        itineraryData.places.length
-      } places provided, and include their names in the dailyItinerary activities.
-    `;
-
-    try {
-      const chatSession = model.startChat({
-        generationConfig,
-        history: [],
-      });
-      const result = await chatSession.sendMessage(prompt);
-      const responseText = result.response.text();
-
-      // Parse the JSON response
-      const jsonStart = responseText.indexOf("{");
-      const jsonEnd = responseText.lastIndexOf("}") + 1;
-      const jsonString = responseText.slice(jsonStart, jsonEnd);
-
-      const parsedItinerary = JSON.parse(jsonString);
-      return parsedItinerary;
-    } catch (error) {
-      console.error("Error generating AI itinerary:", error);
-      throw new Error("Failed to generate itinerary with AI");
-    }
-  };
-
-  const enrichItinerary = (itinerary, places) => {
-    const placeMap = new Map(
-      places.map((place) => [place.displayName?.text || place.name, place])
-    );
-
-    const enrichedDailyItinerary = itinerary.dailyItinerary.map((day) => {
-      const enrichedActivities = day.activities.map((activity) => {
-        const fullPlace = placeMap.get(activity.place);
-        if (fullPlace) {
-          return {
-            ...activity,
-            rating: fullPlace.rating || null,
-            userRatingCount: fullPlace.userRatingCount || null,
-            photos: fullPlace.photos || [],
-            location: fullPlace.location || {},
-          };
-        }
-        return activity;
-      });
-
-      let enrichedLunch = null;
-      if (day.lunch) {
-        const fullLunchPlace = placeMap.get(day.lunch.place);
-        enrichedLunch = fullLunchPlace
-          ? {
-              ...day.lunch,
-              rating: fullLunchPlace.rating || null,
-              userRatingCount: fullLunchPlace.userRatingCount || null,
-              photos: fullLunchPlace.photos || [],
-              location: fullLunchPlace.location || {},
-            }
-          : day.lunch;
-      }
-
-      return {
-        ...day,
-        activities: enrichedActivities,
-        lunch: enrichedLunch,
-      };
-    });
-
-    return {
-      ...itinerary,
-      dailyItinerary: enrichedDailyItinerary,
-    };
-  };
-
-  const saveItineraryToDB = async ({ places, itinerary, parameters }) => {
-    try {
-      if (!user) {
-        throw new Error("User not authenticated");
-      }
-
-      const docRef = await addDoc(collection(db, "itineraries"), {
-        clerkUserId: user.id,
-        userEmail: user.primaryEmailAddress?.emailAddress || "unknown",
-        places, // Array of all places with full details
-        itinerary: {
-          dailyItinerary: itinerary.dailyItinerary,
-          transportationTips: itinerary.transportationTips,
-          additionalNotes: itinerary.additionalNotes,
-        },
-        parameters: {
-          destination: parameters.destination,
-          coordinates: parameters.coordinates,
-          dates: parameters.dates,
-          travelers: parameters.travelers,
-          preferences: parameters.preferences,
-        },
-        createdAt: serverTimestamp(),
-      });
-      console.log("Itinerary saved to Firestore with ID:", docRef.id);
-    } catch (error) {
-      console.error("Error saving itinerary to Firestore:", error);
-      throw new Error("Failed to save itinerary to database");
-    }
-  };
-
-  const updateTravelerCount = (type, increment) => {
-    const newCount = increment ? travelers[type] + 1 : travelers[type] - 1;
-    if (newCount < 0) return;
-    if (type === "adults" && newCount === 0) return;
-    if (type === "infants" && newCount > travelers.adults) return;
-
-    const updatedTravelers = {
-      ...travelers,
-      [type]: newCount,
-    };
-    setTravelersToStore(updatedTravelers);
   };
 
   const handleDateConfirm = (selectedDates) => {
@@ -750,26 +339,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#fff",
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
-  },
-  backButton: {
-    padding: 5,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#000",
-  },
-  placeholder: {
-    width: 24,
-  },
   section: {
     paddingHorizontal: 25,
     paddingVertical: 15,
@@ -803,15 +372,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginLeft: 34,
   },
-  destinationImageContainer: {
-    marginRight: 15,
-  },
-  destinationImage: {
-    width: 80,
-    height: 60,
-    borderRadius: 8,
-    backgroundColor: "#e0e0e0",
-  },
   destinationDetails: {
     flex: 1,
   },
@@ -824,13 +384,6 @@ const styles = StyleSheet.create({
   countryContainer: {
     flexDirection: "row",
     alignItems: "center",
-  },
-  countryDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#333",
-    marginRight: 6,
   },
   countryName: {
     fontSize: 14,
@@ -855,62 +408,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#333",
   },
-  travelersDropdown: {
-    marginTop: 8,
-    position: "relative",
-    zIndex: 4,
-  },
-  travelerContent: {
-    backgroundColor: "#f1f1f1",
-    borderRadius: 12,
-    padding: 16,
-    gap: 16,
-  },
-  travelerType: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  travelerTitle: {
-    color: "black",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  travelerSubtitle: {
-    color: "black",
-    fontSize: 14,
-    marginTop: 4,
-  },
-  counter: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 16,
-    zIndex: 5,
-  },
-  counterButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  buttonDisabled: {},
-  counterButtonText: {
-    color: "black",
-    fontSize: 20,
-    fontWeight: "bold",
-  },
-  counterButtonTextDisabled: {
-    color: "#999",
-    fontSize: 20,
-    fontWeight: "bold",
-  },
-  count: {
-    color: "black",
-    fontSize: 16,
-    fontWeight: "600",
-    minWidth: 24,
-    textAlign: "center",
+  dropdownContainer: {
+    marginLeft: 34,
   },
   loadingContainer: {
     flex: 1,

@@ -4,7 +4,6 @@ import {
   View,
   Image,
   TouchableOpacity,
-  ActivityIndicator,
 } from "react-native";
 import { MotiView, MotiText, AnimatePresence } from "moti";
 import { LinearGradient } from "expo-linear-gradient";

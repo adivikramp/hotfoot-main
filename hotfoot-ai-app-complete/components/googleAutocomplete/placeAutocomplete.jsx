@@ -11,6 +11,7 @@ import {
 import { GooglePlacesAutocomplete } from "react-native-google-places-autocomplete";
 import { Ionicons } from "@expo/vector-icons";
 import "react-native-get-random-values";
+import { GetCityAndAirportIataCodes } from "../../services/AmadeusApi";
 
 const PlaceAutocomplete = ({
   onCitySelect,
@@ -24,32 +25,50 @@ const PlaceAutocomplete = ({
   const [selectedCity, setSelectedCity] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const handleCitySelect = (data, details) => {
+  const handleCitySelect = async (data, details) => {
     if (details) {
-      console.log("Selected city data:", details);
+      // console.log("Selected city data:", JSON.stringify(details, null, 2));
       // console.log("Selected city details:", details);
       setLoading(true);
 
       // Extract city code from address components if available
-      let cityCode = "";
+      let countryCode = "";
       if (details.address_components) {
-        const airportComponent = details.address_components.find((component) =>
-          component.types.includes("iata")
+        const setCountryCode = details.address_components.find((component) =>
+          component.types.includes("country")
         );
-        if (airportComponent) {
-          cityCode = airportComponent.short_name;
+        // if (airportComponent) {
+        //   cityCode = airportComponent.short_name;
+        // }
+        if (setCountryCode) {
+          countryCode = setCountryCode.short_name;
         }
       }
 
-      // If no airport code was found, create a placeholder code
-      if (!cityCode) {
-        // Use first 3 letters of city name as code if no real code is available
-        cityCode = details.name.substring(0, 3).toUpperCase();
-      }
+      console.log("Country Code:", countryCode);
+
+      const response = await GetCityAndAirportIataCodes({
+        keyword: details.name,
+        countryCode: countryCode,
+      });
+
+      // Check if response is valid
+      console.log("API Response:", response);
+
+      // Get city IATA code
+      const cityIataCode = response.data?.[0]?.iataCode;
+
+      // Get airport IATA codes
+      const airportData = response.included?.airports;
+      const airportIataCodes = airportData ? Object.keys(airportData) : [];
+
+      console.log("City IATA Code:", cityIataCode);
+      console.log("Airport IATA Codes:", airportIataCodes);
 
       const cityDetails = {
         name: details.name,
-        code: cityCode,
+        cityCode: cityIataCode,
+        airportIataCodes: airportIataCodes,
         placeId: details.place_id,
         formattedAddress: details.formatted_address,
         coordinates: {
