@@ -19,6 +19,21 @@ import TitleSubtitle from "../../components/titleSubtitle";
 import useUserStore from "../store/userZustandStore";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 
+const countryData = [
+  { cca2: "IN", name: "India", callingCode: "91" },
+  { cca2: "US", name: "United States", callingCode: "1" },
+  { cca2: "GB", name: "United Kingdom", callingCode: "44" },
+  { cca2: "CA", name: "Canada", callingCode: "1" },
+];
+
+const findCountryByCode = (cca2) => {
+  return countryData.find((country) => country.cca2 === cca2);
+};
+
+// const findCountryByCallingCode = (callingCode) => {
+//   return countryData.find((country) => country.callingCode === callingCode);
+// };
+
 const PersonalTouch = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -44,80 +59,134 @@ const PersonalTouch = () => {
     mode: "onChange",
   });
 
-  // Fetch user data from Firestore when component mounts
   useEffect(() => {
     const loadData = async () => {
-      if (userId) {
+      if (userId && !userData) {
+        console.log("Fetching user data for:", userId);
         await fetchUserData(userId, getToken);
       }
     };
     loadData();
-  }, [userId]);
+  }, [userId, userData]);
 
-  // Update form with Clerk user data or Firestore user data
   useEffect(() => {
-    if (userData) {
-      // Prioritize Firestore data if available
+    if (userData?.personalInfo) {
+      console.log("Populating form with Firestore userData:", userData);
+      console.log("userData.personalInfo:", userData.personalInfo);
+
+      let phoneNumber = "";
+      let callingCode = "";
+      let selectedCountry = null;
+
+      if (userData.personalInfo.countryCode) {
+        selectedCountry = findCountryByCode(userData.personalInfo.countryCode);
+      }
+
+      if (userData.personalInfo.phoneNumber) {
+        const phoneWithCode = userData.personalInfo.phoneNumber.replace(
+          /[^\d+]/g,
+          ""
+        );
+
+        if (phoneWithCode.startsWith("+")) {
+          if (selectedCountry) {
+            const codeToRemove = `+${selectedCountry.callingCode}`;
+            if (phoneWithCode.startsWith(codeToRemove)) {
+              phoneNumber = phoneWithCode.substring(codeToRemove.length);
+              callingCode = selectedCountry.callingCode;
+            } else {
+              phoneNumber = phoneWithCode.substring(1);
+            }
+          } else {
+            const possibleCountries = countryData.filter((c) =>
+              phoneWithCode.startsWith(`+${c.callingCode}`)
+            );
+
+            possibleCountries.sort(
+              (a, b) => b.callingCode.length - a.callingCode.length
+            );
+
+            if (possibleCountries.length > 0) {
+              selectedCountry = possibleCountries[0];
+              const codeToRemove = `+${selectedCountry.callingCode}`;
+              phoneNumber = phoneWithCode.substring(codeToRemove.length);
+              callingCode = selectedCountry.callingCode;
+            } else {
+              phoneNumber = phoneWithCode.substring(1);
+            }
+          }
+        } else {
+          phoneNumber = phoneWithCode;
+        }
+      }
+
       reset({
-        firstName: userData.firstName || user?.firstName || "",
-        lastName: userData.lastName || user?.lastName || "",
-        email: userData.email || user?.primaryEmailAddress?.emailAddress || "",
-        phoneNumber:
-          userData.personalInfo?.phoneNumber
-            ?.replace(/[^\d]/g, "")
-            .replace(
-              new RegExp(
-                `^${
-                  userData.personalInfo?.phoneNumber
-                    ?.split("+")[1]
-                    ?.split(" ")[0]
-                }`
-              ),
-              ""
-            ) || "",
+        firstName: userData.personalInfo.firstName || user?.firstName || "",
+        lastName: userData.personalInfo.lastName || user?.lastName || "",
+        email:
+          userData.personalInfo.email ||
+          user?.primaryEmailAddress?.emailAddress ||
+          "",
+        phoneNumber: phoneNumber,
       });
-      if (userData.personalInfo?.countryCode) {
-        setCountry({
-          cca2: userData.personalInfo.countryCode,
-          callingCode:
-            userData.personalInfo.phoneNumber?.split("+")[1]?.split(" ")[0] ||
-            "",
-          name: userData.personalInfo.nationality || "",
-        });
+
+      if (selectedCountry) {
+        const countryObj = {
+          cca2: selectedCountry.cca2,
+          callingCode: selectedCountry.callingCode,
+          name: userData.personalInfo.nationality || selectedCountry.name,
+        };
+        console.log("Setting country:", countryObj);
+        setCountry(countryObj);
+        setCountryCode(selectedCountry.cca2);
       }
     } else if (user) {
-      // Use Clerk data if no Firestore data exists
+      console.log("Populating form with Clerk user data:", {
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.primaryEmailAddress?.emailAddress,
+      });
       reset({
         firstName: user.firstName || "",
         lastName: user.lastName || "",
         email: user.primaryEmailAddress?.emailAddress || "",
         phoneNumber: "",
       });
+      setCountry(null);
+      setCountryCode("");
     }
   }, [userData, user, reset]);
 
   const handleCountrySelect = (selectedCountry) => {
+    console.log("Selected country:", selectedCountry);
     setCountryCode(selectedCountry?.cca2);
     setCountry(selectedCountry);
   };
 
   const onSubmit = async (data) => {
     try {
-      const fullPhoneNumber = country?.callingCode
-        ? `+${country.callingCode}${data.phoneNumber}`
-        : data.phoneNumber;
+      if (!country) {
+        alert("Please select your country");
+        return;
+      }
+
+      if (!/^\d+$/.test(data.phoneNumber)) {
+        alert("Please enter a valid phone number (digits only)");
+        return;
+      }
+
+      const fullPhoneNumber = `+${country.callingCode}${data.phoneNumber}`;
 
       const personalInfo = {
         firstName: data.firstName,
         lastName: data.lastName,
         email: data.email,
-        nationality: country?.name || "",
+        nationality: country.name,
         phoneNumber: fullPhoneNumber,
-        countryCode: country?.cca2 || "",
+        countryCode: country.cca2,
       };
 
-      console.log("personalInfo to be saved:", personalInfo);
-
+      console.log("Saving personalInfo:", personalInfo);
       await updatePersonalInfo(userId, getToken, personalInfo);
 
       if (params.flow === "onboarding") {
@@ -143,6 +212,11 @@ const PersonalTouch = () => {
     );
   }
 
+  console.log("CountryPicker props:", {
+    value: country,
+    countryCode: country?.cca2,
+  });
+
   return (
     <SafeAreaView style={{ backgroundColor: "white", flex: 1 }}>
       <TopBar backarrow progress={0.5} />
@@ -155,20 +229,14 @@ const PersonalTouch = () => {
         />
         <View className="container">
           <View style={styles.imageContainer}>
-            <View>
-              <Image
-                style={styles.image}
-                source={
-                  user?.imageUrl
-                    ? { uri: user.imageUrl }
-                    : require("../../assets/images/icon.png")
-                }
-              />
-              {/* <Image
-                style={styles.imageEditIcon}
-                source={require("../../assets/images/edit-icon.png")}
-              /> */}
-            </View>
+            <Image
+              style={styles.image}
+              source={
+                user?.imageUrl
+                  ? { uri: user.imageUrl }
+                  : require("../../assets/images/icon.png")
+              }
+            />
           </View>
 
           <Text style={styles.label}>First Name</Text>
@@ -231,6 +299,7 @@ const PersonalTouch = () => {
             <CountryPickerComponent
               onSelect={handleCountrySelect}
               value={country}
+              countryCode={country?.cca2}
             />
           </View>
 
@@ -292,14 +361,6 @@ const styles = StyleSheet.create({
     borderRadius: 100,
     borderColor: "#f1f1f1",
     borderWidth: 1,
-  },
-  imageEditIcon: {
-    position: "absolute",
-    height: 25,
-    width: 25,
-    right: 10,
-    bottom: 10,
-    borderRadius: 100,
   },
   input: {
     borderColor: "#f1f1f1",

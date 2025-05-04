@@ -34,11 +34,9 @@ import DatePickerModal from "../datePickerModal/datePickerModal";
 import useUserStore from "../../app/store/userZustandStore";
 import SkeletonLoading from "../skeletonLoading/skeletonLoading";
 import { formatHotelSearchParams, searchHotels } from "../../services/SerpApi";
+import TravelLoadingModal from "../travelLoadingModal/TravelLoadingModal";
 
 const fetchCitiesWithImages = async (data) => {
-  // if (!data) return;
-  // console.log('data: ', data)
-
   try {
     const citiesWithImages = await Promise.all(
       data?.map(async (city) => {
@@ -66,6 +64,8 @@ export const CityList = ({ data }) => {
   const [places, setPlaces] = useState([]);
   const navigation = useNavigation();
   const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
   const {
     toLocation,
     travelers,
@@ -76,26 +76,27 @@ export const CityList = ({ data }) => {
   } = useTripSearchStore();
 
   const handleDateConfirm = async (selectedDates) => {
+    setIsLoading(true);
     console.log("selectedDates:", selectedDates);
     setDatesToStore({
       startDate: selectedDates.startDate,
       endDate: selectedDates.endDate,
     });
+
     const searchDataHotels = {
       dates: {
         startDate: selectedDates.startDate,
         endDate: selectedDates.endDate,
         totalDays: selectedDates.totalDays,
       },
-      toLocation,
+      toLocation: toLocation.name,
       travelers,
     };
-
-    console.log(searchDataHotels);
 
     try {
       const apiParams = formatHotelSearchParams(searchDataHotels);
       const hotelResults = await searchHotels(apiParams);
+      setIsLoading(false);
       navigation.navigate("place/cityDetails", {
         hotelResults: JSON.stringify(hotelResults),
         searchData: JSON.stringify({
@@ -104,8 +105,8 @@ export const CityList = ({ data }) => {
           check_out_date: formatDateForAPI(selectedDates.endDate),
         }),
       });
-      onClose();
     } catch (error) {
+      setIsLoading(false);
       console.error("Hotel search error:", error);
       Alert.alert("Error", "Failed to search for hotels. Please try again.");
     }
@@ -129,7 +130,6 @@ export const CityList = ({ data }) => {
 
   useEffect(() => {
     fetchData();
-    // console.log('places:', places)
   }, []);
 
   const fetchData = async () => {
@@ -201,6 +201,7 @@ export const CityList = ({ data }) => {
         horizontal={true}
         showsHorizontalScrollIndicator={false}
       />
+      <TravelLoadingModal visible={isLoading} />
       <DatePickerModal
         visible={isDatePickerVisible}
         onClose={() => setIsDatePickerVisible(false)}
@@ -214,9 +215,12 @@ export const CityList = ({ data }) => {
 };
 
 export const TopPicksCityList = ({ data }) => {
-  const [cities, setCities] = useState([]);
   const navigation = useNavigation();
+
+  const [cities, setCities] = useState([]);
   const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
   const {
     toLocation,
     travelers,
@@ -227,6 +231,7 @@ export const TopPicksCityList = ({ data }) => {
   } = useTripSearchStore();
 
   const handleDateConfirm = async (selectedDates) => {
+    setIsLoading(true);
     console.log("selectedDates:", selectedDates);
     setDatesToStore({
       startDate: selectedDates.startDate,
@@ -243,11 +248,10 @@ export const TopPicksCityList = ({ data }) => {
       travelers,
     };
 
-    console.log(searchDataHotels);
-
     try {
       const apiParams = formatHotelSearchParams(searchDataHotels);
       const hotelResults = await searchHotels(apiParams);
+      setIsLoading(false);
       navigation.navigate("place/cityDetails", {
         hotelResults: JSON.stringify(hotelResults),
         searchData: JSON.stringify({
@@ -256,8 +260,8 @@ export const TopPicksCityList = ({ data }) => {
           check_out_date: formatDateForAPI(selectedDates.endDate),
         }),
       });
-      onClose();
     } catch (error) {
+      setIsLoading(false);
       console.error("Hotel search error:", error);
       Alert.alert("Error", "Failed to search for hotels. Please try again.");
     }
@@ -345,6 +349,7 @@ export const TopPicksCityList = ({ data }) => {
         horizontal={true}
         showsHorizontalScrollIndicator={false}
       />
+      <TravelLoadingModal visible={isLoading} />
       <DatePickerModal
         visible={isDatePickerVisible}
         onClose={() => setIsDatePickerVisible(false)}
@@ -442,7 +447,6 @@ export const ExploreFlatList = ({ category, onLoading }) => {
 
   const centerCoordinates = userLocation?.coordinates || fallbackCoordinates;
 
-  // types for google api
   const body = {
     includedPrimaryTypes: [category],
     maxResultCount: 20,
