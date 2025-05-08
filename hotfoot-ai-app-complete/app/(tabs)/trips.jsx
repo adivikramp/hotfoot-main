@@ -62,6 +62,7 @@ const Trips = () => {
                   place.displayName?.text === activity.place ||
                   place.name === activity.place
               );
+              console.log("Photo Reference:", matchingPlace?.photos?.[0]?.name.split("/photos/")[1]);
               return {
                 title: activity.place,
                 type: activity.type,
@@ -72,7 +73,7 @@ const Trips = () => {
                 rating: matchingPlace?.rating || null,
                 reviews: matchingPlace?.userRatingCount || null,
                 image: matchingPlace?.photos?.[0]?.name
-                  ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${matchingPlace.photos[0].name}&key=${process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}`
+                  ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${matchingPlace.photos[0].name.split("/photos/")[1]}&key=${process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}`
                   : "https://via.placeholder.com/400",
                 transportTimes: matchingPlace?.transportTimes || null,
               };
@@ -105,7 +106,7 @@ const Trips = () => {
                           (place) =>
                             place.displayName?.text === day.lunch.place ||
                             place.name === day.lunch.place
-                        ).photos[0].name
+                        ).photos[0].name.split("/photos/")[1]
                       }&key=${process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}`
                     : "https://via.placeholder.com/400",
                   transportTimes:
@@ -127,7 +128,7 @@ const Trips = () => {
               name: data.parameters.destination || "",
               country: data.parameters.toLocation?.country || "",
               coverImage: data.places[0]?.photos?.[0]?.name
-                ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${data.places[0].photos[0].name}&key=${process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}`
+                ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${data.places[0].photos[0].name.split("/photos/")[1]}&key=${process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}`
                 : "https://via.placeholder.com/400",
             },
             startDate: data.parameters.dates.start || "N/A",
@@ -149,7 +150,7 @@ const Trips = () => {
           dailyPlan,
         };
       });
-
+      console.log("Fetched trips:", JSON.stringify(trips, null, 2));
       setUserTrips(trips);
     } catch (err) {
       console.error("Error fetching user trips from Firestore:", err);

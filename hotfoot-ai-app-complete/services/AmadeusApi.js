@@ -105,10 +105,10 @@ export const GetCityAndAirportIataCodes = async ({ keyword, countryCode }) => {
 
     // keyword and countryCode from GetCityAndAirportIataCodes: {"countryCode": "GB", "keyword": "London"}
 
-    console.log(
-      "keyword and countryCode from GetCityAndAirportIataCodes:",
-      body
-    );
+    // console.log(
+    //   "keyword and countryCode from GetCityAndAirportIataCodes:",
+    //   body
+    // );
 
     const response = await axios.post(
       BASE_URL_FOR_CITY_AND_AIRPORT_IATACODES,
@@ -116,7 +116,7 @@ export const GetCityAndAirportIataCodes = async ({ keyword, countryCode }) => {
     );
     // const topTrends = await axios.get(BASE_URL_FOR_TOP_TRENDS_FROM_YOUR_CITY, topTrendsFromYourCityconfig)
 
-    console.log("topPicks from A-api:", response);
+    // console.log("topPicks from A-api:", response);
 
     return response.data;
   } catch (error) {

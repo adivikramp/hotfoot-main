@@ -16,6 +16,7 @@ import {
   GetPlaceDetailsByTextSearch,
 } from "../../services/GlobalApi";
 import {
+  GetCityAndAirportIataCodes,
   TopPicksOnlyForYou,
   TopTrendsFromYourCityApi,
 } from "../../services/AmadeusApi";
@@ -33,8 +34,11 @@ import useTripSearchStore from "../../app/store/trpiSearchZustandStore";
 import DatePickerModal from "../datePickerModal/datePickerModal";
 import useUserStore from "../../app/store/userZustandStore";
 import SkeletonLoading from "../skeletonLoading/skeletonLoading";
-import { formatHotelSearchParams, searchHotels } from "../../services/SerpApi";
+import { formatFlightSearchParams, formatHotelSearchParams, searchHotels, searchOutboundFlights } from "../../services/SerpApi";
 import TravelLoadingModal from "../travelLoadingModal/TravelLoadingModal";
+import { HotelCardResults } from "../hotelCard/hotelCardResults";
+import { search } from "react-native-country-picker-modal/lib/CountryService";
+
 
 const fetchCitiesWithImages = async (data) => {
   try {
@@ -65,9 +69,11 @@ export const CityList = ({ data }) => {
   const navigation = useNavigation();
   const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const { userLocation } = useUserStore();
 
   const {
     toLocation,
+    fromLocation,
     travelers,
     setFromLocationToStore,
     setToLocationToStore,
@@ -76,41 +82,82 @@ export const CityList = ({ data }) => {
   } = useTripSearchStore();
 
   const handleDateConfirm = async (selectedDates) => {
-    setIsLoading(true);
-    console.log("selectedDates:", selectedDates);
-    setDatesToStore({
-      startDate: selectedDates.startDate,
-      endDate: selectedDates.endDate,
-    });
+    try {
+      setIsLoading(true);
+      console.log("selectedDates:", selectedDates);
 
-    const searchDataHotels = {
-      dates: {
+      // Store selected dates
+      setDatesToStore({
         startDate: selectedDates.startDate,
         endDate: selectedDates.endDate,
-        totalDays: selectedDates.totalDays,
-      },
-      toLocation: toLocation.name,
-      travelers,
-    };
+      });
 
-    try {
-      const apiParams = formatHotelSearchParams(searchDataHotels);
-      const hotelResults = await searchHotels(apiParams);
+      // Fetch IATA codes for both locations in parallel
+      const [fromIataRes, toIataRes] = await Promise.all([
+        fromLocation?.name ? GetCityAndAirportIataCodes({ keyword: fromLocation.name }) : Promise.resolve(null),
+        toLocation?.name ? GetCityAndAirportIataCodes({ keyword: toLocation.name }) : Promise.resolve(null),
+      ]);
+
+      const getCityAndAirportCodes = (res) => {
+        const cityCode = res?.data?.[0]?.iataCode;
+        const airports = res?.included?.airports;
+        const airportCodes = airports ? Object.keys(airports) : [];
+        return { cityCode, airportCodes };
+      };
+
+      const fromCodes = getCityAndAirportCodes(fromIataRes);
+      const toCodes = getCityAndAirportCodes(toIataRes);
+
+      const searchDataHotels = {
+        dates: {
+          startDate: selectedDates.startDate,
+          endDate: selectedDates.endDate,
+          totalDays: selectedDates.totalDays,
+        },
+        toLocation: toLocation.name,
+        travelers,
+      };
+
+      // console.log("searchDataHotels:", searchDataHotels);
+
+      const searchDataFlights = {
+        fromLocation: fromCodes.airportCodes.join(","),
+        toLocation: toCodes.airportCodes.join(","),
+        dates: {
+          startDate: selectedDates.startDate,
+          endDate: selectedDates.endDate,
+        },
+        travelers,
+        tripType: "Round Trip",
+        cabinClass: "economy",
+      };
+
+      console.log("searchDataFlights:", searchDataFlights);
+
+      const [flightResults, hotelResults] = await Promise.all([
+        searchOutboundFlights(formatFlightSearchParams(searchDataFlights)),
+        searchHotels(formatHotelSearchParams(searchDataHotels)),
+      ]);
+
       setIsLoading(false);
+
       navigation.navigate("place/cityDetails", {
+        flightResults: JSON.stringify(flightResults),
         hotelResults: JSON.stringify(hotelResults),
         searchData: JSON.stringify({
-          ...apiParams,
+          searchDataFlights: JSON.stringify(formatFlightSearchParams(searchDataFlights)),
+          searchDataHotels: JSON.stringify(formatHotelSearchParams(searchDataHotels)),
           check_in_date: formatDateForAPI(selectedDates.startDate),
           check_out_date: formatDateForAPI(selectedDates.endDate),
         }),
       });
     } catch (error) {
+      console.error("Search error:", error);
       setIsLoading(false);
-      console.error("Hotel search error:", error);
-      Alert.alert("Error", "Failed to search for hotels. Please try again.");
+      Alert.alert("Error", "Failed to search. Please try again.");
     }
   };
+
 
   const formatDateForAPI = (dateString) => {
     const date = new Date(dateString);
@@ -121,9 +168,10 @@ export const CityList = ({ data }) => {
 
   const handlePress = ({ toLocation }) => {
     console.log("toLocation:", toLocation);
+    const fromLocation = { "geoCode": { "latitude": userLocation.coordinates.latitude, "longitude": userLocation.coordinates.longitude }, "name": userLocation.city }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     resetSearch();
-    setFromLocationToStore("fromLocation");
+    setFromLocationToStore(fromLocation);
     setToLocationToStore(toLocation);
     setIsDatePickerVisible(true);
   };
@@ -208,7 +256,7 @@ export const CityList = ({ data }) => {
         onSelectDates={handleDateConfirm}
         activeTab={"Places"}
         tripType={"Round Trip"}
-        // initialDates={dates}
+      // initialDates={dates}
       />
     </View>
   );
@@ -220,9 +268,11 @@ export const TopPicksCityList = ({ data }) => {
   const [cities, setCities] = useState([]);
   const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const { userLocation } = useUserStore();
 
   const {
     toLocation,
+    fromLocation,
     travelers,
     setFromLocationToStore,
     setToLocationToStore,
@@ -231,39 +281,79 @@ export const TopPicksCityList = ({ data }) => {
   } = useTripSearchStore();
 
   const handleDateConfirm = async (selectedDates) => {
-    setIsLoading(true);
-    console.log("selectedDates:", selectedDates);
-    setDatesToStore({
-      startDate: selectedDates.startDate,
-      endDate: selectedDates.endDate,
-    });
+    try {
+      setIsLoading(true);
+      console.log("selectedDates:", selectedDates);
 
-    const searchDataHotels = {
-      dates: {
+      // Store selected dates
+      setDatesToStore({
         startDate: selectedDates.startDate,
         endDate: selectedDates.endDate,
-        totalDays: selectedDates.totalDays,
-      },
-      toLocation: toLocation.name,
-      travelers,
-    };
+      });
 
-    try {
-      const apiParams = formatHotelSearchParams(searchDataHotels);
-      const hotelResults = await searchHotels(apiParams);
+      // Fetch IATA codes for both locations in parallel
+      const [fromIataRes, toIataRes] = await Promise.all([
+        fromLocation?.name ? GetCityAndAirportIataCodes({ keyword: fromLocation.name }) : Promise.resolve(null),
+        toLocation?.name ? GetCityAndAirportIataCodes({ keyword: toLocation.name }) : Promise.resolve(null),
+      ]);
+
+      const getCityAndAirportCodes = (res) => {
+        const cityCode = res?.data?.[0]?.iataCode;
+        const airports = res?.included?.airports;
+        const airportCodes = airports ? Object.keys(airports) : [];
+        return { cityCode, airportCodes };
+      };
+
+      const fromCodes = getCityAndAirportCodes(fromIataRes);
+      const toCodes = getCityAndAirportCodes(toIataRes);
+
+      const searchDataHotels = {
+        dates: {
+          startDate: selectedDates.startDate,
+          endDate: selectedDates.endDate,
+          totalDays: selectedDates.totalDays,
+        },
+        toLocation: toLocation.name,
+        travelers,
+      };
+
+      // console.log("searchDataHotels:", searchDataHotels);
+
+      const searchDataFlights = {
+        fromLocation: fromCodes.airportCodes.join(","),
+        toLocation: toCodes.airportCodes.join(","),
+        dates: {
+          startDate: selectedDates.startDate,
+          endDate: selectedDates.endDate,
+        },
+        travelers,
+        tripType: "Round Trip",
+        cabinClass: "economy",
+      };
+
+      console.log("searchDataFlights:", searchDataFlights);
+
+      const [flightResults, hotelResults] = await Promise.all([
+        searchOutboundFlights(formatFlightSearchParams(searchDataFlights)),
+        searchHotels(formatHotelSearchParams(searchDataHotels)),
+      ]);
+
       setIsLoading(false);
+
       navigation.navigate("place/cityDetails", {
+        flightResults: JSON.stringify(flightResults),
         hotelResults: JSON.stringify(hotelResults),
         searchData: JSON.stringify({
-          ...apiParams,
-          check_in_date: formatDateForAPI(selectedDates.startDate),
-          check_out_date: formatDateForAPI(selectedDates.endDate),
+          searchDataFlights: JSON.stringify(formatFlightSearchParams(searchDataFlights)),
+          searchDataHotels: JSON.stringify(formatHotelSearchParams(searchDataHotels)),
+          // check_in_date: formatDateForAPI(selectedDates.startDate),
+          // check_out_date: formatDateForAPI(selectedDates.endDate),
         }),
       });
     } catch (error) {
+      console.error("Search error:", error);
       setIsLoading(false);
-      console.error("Hotel search error:", error);
-      Alert.alert("Error", "Failed to search for hotels. Please try again.");
+      Alert.alert("Error", "Failed to search. Please try again.");
     }
   };
 
@@ -276,9 +366,10 @@ export const TopPicksCityList = ({ data }) => {
 
   const handlePress = ({ toLocation }) => {
     console.log("toLocation:", toLocation);
+    const fromLocation = { "geoCode": { "latitude": userLocation.coordinates.latitude, "longitude": userLocation.coordinates.longitude }, "name": userLocation.city }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     resetSearch();
-    setFromLocationToStore("fromLocation");
+    setFromLocationToStore(fromLocation);
     setToLocationToStore(toLocation);
     setIsDatePickerVisible(true);
   };
@@ -356,7 +447,7 @@ export const TopPicksCityList = ({ data }) => {
         onSelectDates={handleDateConfirm}
         activeTab={"Places"}
         tripType={"Round Trip"}
-        // initialDates={dates}
+      // initialDates={dates}
       />
     </View>
   );
@@ -440,9 +531,11 @@ export const TopTrendsFromYourCity = ({ data }) => {
 
 export const ExploreFlatList = ({ category, onLoading }) => {
   const [places, setPlaces] = useState([]);
+  const [searchParams, setSearchParams] = useState([]);
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const { userLocation } = useUserStore();
+  const { travelers } = useTripSearchStore();
   const width = Dimensions.get("window").width;
 
   const centerCoordinates = userLocation?.coordinates || fallbackCoordinates;
@@ -469,9 +562,28 @@ export const ExploreFlatList = ({ category, onLoading }) => {
   const fetchData = async () => {
     try {
       if (category === "hotel") {
-        setPlaces(hotelDetails.properties);
+
+        const today =  new Date().toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "short",
+          day: "2-digit",
+        });
+        const searchDataHotels = {
+          dates: {
+            startDate: today,
+            endDate: today
+          },
+          toLocation: userLocation.city,
+          travelers,
+        };
+        const hotelResults = await searchHotels(formatHotelSearchParams(searchDataHotels))
+
+        console.log("hotelResults: ", hotelResults.search_parameters);
+        setSearchParams(hotelResults.search_parameters);
+        setPlaces(hotelResults.properties);
       } else {
         const popularDestinations = await GetPlaceDetails(body);
+        console.log('popularDestinations:', JSON.stringify(popularDestinations, null, 2));
 
         setPlaces(popularDestinations.places);
       }
@@ -483,7 +595,7 @@ export const ExploreFlatList = ({ category, onLoading }) => {
   const renderItem = ({ item }) => {
     const handlePlacePress = () => {
       if (category?.toString() !== "hotel") {
-        const url = `https://www.google.com/maps/search/?api=1&query=${item.location.latitude},${item.location.longitude}`;
+        const url = `https://www.google.com/maps/search/?api=1&query=${item?.displayName?.text}`;
         Linking.openURL(url).catch((err) =>
           console.error("Failed to open Google Maps:", err)
         );
@@ -492,7 +604,11 @@ export const ExploreFlatList = ({ category, onLoading }) => {
 
     return category?.toString() === "hotel" ? (
       <View>
-        <HotelCard hotel={item} />
+        <HotelCardResults
+              hotel={item}
+              searchParams={searchParams}
+              amenities={item.amenities || []}
+            />
       </View>
     ) : (
       <View>
@@ -501,9 +617,8 @@ export const ExploreFlatList = ({ category, onLoading }) => {
             <View>
               <Image
                 source={{
-                  uri: `https://maps.googleapis.com/maps/api/place/photo?maxwidth=1000&photoreference=${
-                    item.photos[0].name.split("/photos/")[1]
-                  }&key=${process.env.EXPO_PUBLIC_GOOGLE_PLACE_API_KEY}`,
+                  uri: `https://maps.googleapis.com/maps/api/place/photo?maxwidth=1000&photoreference=${item.photos[0].name.split("/photos/")[1]
+                    }&key=${process.env.EXPO_PUBLIC_GOOGLE_PLACE_API_KEY}`,
                 }}
                 style={{
                   width: Dimensions.get("window").width - 35,

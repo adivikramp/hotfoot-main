@@ -4,12 +4,21 @@ import {
   StyleSheet,
   TouchableOpacity,
   SafeAreaView,
+  Linking,
 } from "react-native";
 import React from "react";
 import { useRouter } from "expo-router";
-import { ChevronRight, User, Map, LogOut } from "lucide-react-native";
+import {
+  ChevronRight,
+  User,
+  Map,
+  LogOut,
+  Siren,
+  Handshake,
+} from "lucide-react-native";
 import { useAuth } from "@clerk/clerk-expo";
 import TopBar from "../../components/topBar";
+import useUserStore from "../store/userZustandStore";
 
 const Settings = () => {
   const router = useRouter();
@@ -37,8 +46,10 @@ const Settings = () => {
     try {
       console.log("Logging out...");
       await signOut();
-      router.replace("/auth");
+      useUserStore.getState().clearUserData();
+
       console.log("User logged out successfully");
+      router.replace("/auth");
     } catch (err) {
       console.error("Failed to log out:", err);
       Alert.alert("Error", "Failed to log out. Please try again.");
@@ -68,6 +79,36 @@ const Settings = () => {
               <User size={22} color="#000" />
             </View>
             <Text style={styles.menuItemText}>Personal Info</Text>
+          </View>
+          <ChevronRight size={20} color="#666" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() =>
+            Linking.openURL("https://hotfootai.vercel.app/terms-of-service")
+          }
+        >
+          <View style={styles.menuItemLeft}>
+            <View style={styles.iconContainer}>
+              <Handshake size={22} color="#000" />
+            </View>
+            <Text style={styles.menuItemText}>Terms of Service</Text>
+          </View>
+          <ChevronRight size={20} color="#666" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() =>
+            Linking.openURL("https://hotfootai.vercel.app/privacy-policy")
+          }
+        >
+          <View style={styles.menuItemLeft}>
+            <View style={styles.iconContainer}>
+              <Siren size={22} color="#000" />
+            </View>
+            <Text style={styles.menuItemText}>Privacy Policy</Text>
           </View>
           <ChevronRight size={20} color="#666" />
         </TouchableOpacity>

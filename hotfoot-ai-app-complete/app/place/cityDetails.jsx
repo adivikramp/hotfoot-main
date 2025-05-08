@@ -257,7 +257,7 @@ export default function ExploreScreen() {
               <Text style={styles.sectionTitle}>
                 Travel from {fromLocation.name}
               </Text>
-              <Info size={20} color="#666" />
+              {/* <Info size={20} color="#666" /> */}
             </View>
 
             <TouchableOpacity style={styles.priceAlert}>

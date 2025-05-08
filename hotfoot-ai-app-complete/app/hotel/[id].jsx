@@ -589,7 +589,7 @@ export default function Page() {
               <TouchableOpacity style={styles.backButton} onPress={handleBack}>
                 <Ionicons name="chevron-back" size={24} color="white" />
               </TouchableOpacity>
-              <View style={styles.rightButtons}>
+              {/* <View style={styles.rightButtons}>
                 <TouchableOpacity style={styles.bookmarkButton}>
                   <Ionicons name="heart-outline" size={22} color="white" />
                 </TouchableOpacity>
@@ -600,7 +600,7 @@ export default function Page() {
                     color="white"
                   />
                 </TouchableOpacity>
-              </View>
+              </View> */}
             </View>
 
             {/* Image navigation controls */}
@@ -832,10 +832,10 @@ export default function Page() {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Location</Text>
-              <TouchableOpacity style={styles.seeAllButton}>
+              {/* <TouchableOpacity style={styles.seeAllButton}>
                 <Text style={styles.seeAllText}>Directions</Text>
                 <MaterialIcons name="directions" size={16} color="black" />
-              </TouchableOpacity>
+              </TouchableOpacity> */}
             </View>
             <View style={styles.mapContainer}>
               <MapView
@@ -982,10 +982,10 @@ export default function Page() {
               </SafeAreaView>
             </Modal>
 
-            <TouchableOpacity style={styles.writeReviewButton}>
+            {/* <TouchableOpacity style={styles.writeReviewButton}>
               <Ionicons name="create-outline" size={18} color="#FFF" />
               <Text style={styles.writeReviewText}>Write a Review</Text>
-            </TouchableOpacity>
+            </TouchableOpacity> */}
           </View>
         )}
 

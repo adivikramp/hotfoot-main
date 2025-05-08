@@ -14,23 +14,70 @@ import useTripSearchStore from "../../app/store/trpiSearchZustandStore";
 import DatePickerModal from "../datePickerModal/datePickerModal";
 import * as Haptics from "expo-haptics";
 import SkeletonLoading from "../skeletonLoading/skeletonLoading";
+import { GetCityAndAirportIataCodes } from "../../services/AmadeusApi";
+import useUserStore from "../../app/store/userZustandStore";
+import { searchHotels } from "../../services/SerpApi";
 
 // Enhanced Hotel Card Component in Row View with Monochrome Theme - Shorter Version
 export const HotelCard = ({ hotel }) => {
   const navigation = useNavigation();
   const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
   const [loading, setLoading] = useState(true);
-  const { setDatesToStore, resetSearch } = useTripSearchStore();
+  const { toLocation,
+    fromLocation,
+    travelers,
+    setFromLocationToStore,
+    setToLocationToStore, setDatesToStore, resetSearch } = useTripSearchStore();
+  const { userLocation } = useUserStore();
 
-  const handleDateConfirm = (selectedDates) => {
-    console.log("selectedDates:", selectedDates);
-    setDatesToStore({
-      startDate: selectedDates.startDate,
-      endDate: selectedDates.endDate,
-    });
-    navigation.navigate("hotel/[id]", {
-      property_token: hotel?.property_token,
-    });
+  const handleDateConfirm = async (selectedDates) => {
+    try {
+      console.log("selectedDates:", selectedDates);
+
+      // Store selected dates
+      setDatesToStore({
+        startDate: selectedDates.startDate,
+        endDate: selectedDates.endDate,
+      });
+
+      
+
+
+
+
+      const searchDataHotels = {
+        dates: {
+          startDate: selectedDates.startDate,
+          endDate: selectedDates.endDate,
+          totalDays: selectedDates.totalDays,
+        },
+        toLocation: toLocation.name,
+        travelers,
+      };
+
+      // console.log("searchDataHotels:", searchDataHotels);
+
+
+      const [hotelResults] = await Promise.all([
+        searchHotels(formatHotelSearchParams(searchDataHotels)),
+      ]);
+
+      router.push({
+        pathname: "/hotel/[id]",
+        params: {
+          id: hotelResults.property_token,
+          name: hotelResults?.name || "Hotel",
+          image: hotel?.images?.[0]?.original_image || "",
+          location: `${hotel?.nearby_places?.[0]?.name || "City Centre"}`,
+          searchParams: JSON.stringify(searchParams || {}),
+          amenities: JSON.stringify(amenities || []),
+        },
+      });
+    } catch (error) {
+      console.error("Search error:", error);
+      setIsLoading(false);
+      Alert.alert("Error", "Failed to search. Please try again.");
+    }
   };
 
   const handlePress = () => {
@@ -95,9 +142,8 @@ export const HotelCard = ({ hotel }) => {
           <View style={styles.locationContainer}>
             <View style={styles.locationDot} />
             <Text style={styles.locationText} numberOfLines={1}>
-              {`${hotel?.nearby_places[0]?.name || "Dublin City Centre"} - ${
-                hotel?.nearby_places[0]?.transportations[0]?.duration || "5 min"
-              }s ${hotel?.nearby_places[0]?.transportations[0]?.type}`}
+              {`${hotel?.nearby_places[0]?.name || "Dublin City Centre"} - ${hotel?.nearby_places[0]?.transportations[0]?.duration || "5 min"
+                }s ${hotel?.nearby_places[0]?.transportations[0]?.type}`}
             </Text>
           </View>
 
@@ -150,7 +196,7 @@ export const HotelCard = ({ hotel }) => {
         onSelectDates={handleDateConfirm}
         activeTab={"Places"}
         tripType={"Round Trip"}
-        // initialDates={dates}
+      // initialDates={dates}
       />
     </TouchableOpacity>
   );
