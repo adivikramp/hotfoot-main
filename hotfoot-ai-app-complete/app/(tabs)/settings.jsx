@@ -86,7 +86,7 @@ const Settings = () => {
         <TouchableOpacity
           style={styles.menuItem}
           onPress={() =>
-            Linking.openURL("https://hotfootai.vercel.app/terms-of-service")
+            Linking.openURL("https://www.hotfoot.ai/terms-of-service")
           }
         >
           <View style={styles.menuItemLeft}>
@@ -101,7 +101,7 @@ const Settings = () => {
         <TouchableOpacity
           style={styles.menuItem}
           onPress={() =>
-            Linking.openURL("https://hotfootai.vercel.app/privacy-policy")
+            Linking.openURL("https://www.hotfoot.ai/privacy-policy")
           }
         >
           <View style={styles.menuItemLeft}>
