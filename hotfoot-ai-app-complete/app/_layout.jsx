@@ -64,6 +64,10 @@ export default function RootLayout() {
           options={{ headerShown: false }}
         />
         <Stack.Screen
+          name="preferences/accountManagement"
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
           name="trip-details/index"
           options={{ headerShown: false }}
         />

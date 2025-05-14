@@ -538,7 +538,7 @@ export const ExploreFlatList = ({ category, onLoading }) => {
   const { travelers } = useTripSearchStore();
   const width = Dimensions.get("window").width;
 
-  const centerCoordinates = userLocation?.coordinates || fallbackCoordinates;
+  const centerCoordinates = userLocation?.coordinates;
 
   const body = {
     includedPrimaryTypes: [category],
@@ -573,7 +573,7 @@ export const ExploreFlatList = ({ category, onLoading }) => {
             startDate: today,
             endDate: today
           },
-          toLocation: userLocation.city,
+          toLocation: userLocation?.city || "Unknown",
           travelers,
         };
         const hotelResults = await searchHotels(formatHotelSearchParams(searchDataHotels))

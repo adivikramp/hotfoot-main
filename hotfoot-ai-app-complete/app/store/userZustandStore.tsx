@@ -6,7 +6,7 @@ import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 
 interface UserState {
     userData: any | null;
-    userLocation: { city: string; country: string; coordinates: { latitude: number; longitude: number } } | null;
+    userLocation: { city: string | null; country: string | null; coordinates: { latitude: number | null; longitude: number | null } } | null;
     locationPermission: string | null;
     onboardingStep: string | null;
     loading: boolean;
@@ -27,7 +27,14 @@ const useUserStore = create<UserState>()(
     persist(
         (set, get) => ({
             userData: null,
-            userLocation: null,
+            userLocation: {
+                city: null,
+                country: null,
+                coordinates: {
+                    latitude: null,
+                    longitude: null,
+                },
+            },
             locationPermission: null,
             onboardingStep: null,
             loading: false,
@@ -167,13 +174,29 @@ const useUserStore = create<UserState>()(
                 }
             },
 
-            setUserLocation: (location) => set({ userLocation: location }),
+            setUserLocation: (location) => set({
+                userLocation: {
+                    city: location.city || null,
+                    country: location.country || null,
+                    coordinates: {
+                        latitude: location.coordinates?.latitude || null,
+                        longitude: location.coordinates?.longitude || null,
+                    },
+                },
+            }),
 
             setLocationPermission: (permission) => set({ locationPermission: permission }),
 
             clearUserData: () => set({
                 userData: null,
-                userLocation: null,
+                userLocation: {
+                    city: null,
+                    country: null,
+                    coordinates: {
+                        latitude: null,
+                        longitude: null,
+                    },
+                },
                 locationPermission: null,
                 onboardingStep: null,
                 error: null,
