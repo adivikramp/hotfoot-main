@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   Modal,
   Alert,
-  ActivityIndicator,
 } from "react-native";
 import { useState } from "react";
 import { useRouter } from "expo-router";
@@ -23,7 +22,7 @@ import {
 } from "firebase/firestore";
 import TopBar from "../../components/topBar";
 import useUserStore from "../store/userZustandStore";
-import { Trash2, Plane } from "lucide-react-native";
+import { Trash2, ArrowLeft } from "lucide-react-native";
 import LottieView from "lottie-react-native";
 
 const MAX_RETRIES = 3;
@@ -230,6 +229,15 @@ const AccountManagement = () => {
           </View>
         </Modal>
       </View>
+
+      <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+        <View style={styles.menuItemLeft}>
+          <View style={styles.backIconContainer}>
+            <ArrowLeft size={22} color="#000" />
+          </View>
+          <Text style={styles.backText}>Back</Text>
+        </View>
+      </TouchableOpacity>
     </View>
   );
 };
@@ -334,6 +342,31 @@ const styles = StyleSheet.create({
     color: "#000000",
     textAlign: "center",
     marginBottom: 12,
+  },
+  menuItemLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  backButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    marginTop: "auto",
+  },
+  backIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#FFF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  backText: {
+    fontSize: 18,
+    color: "#000",
+    fontWeight: "500",
+    marginLeft: 6,
   },
 });
 
